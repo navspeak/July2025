@@ -1,0 +1,5 @@
+1.  curl -o .gitignore https://raw.githubusercontent.com/github/gitignore/main/Java.gitignore
+git commit -m "first commit"
+git branch -M main
+git remote add origin https://github.com/navspeak/July2025.git
+git push -u origin main
