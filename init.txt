@@ -3,3 +3,16 @@ git commit -m "first commit"
 git branch -M main
 git remote add origin https://github.com/navspeak/July2025.git
 git push -u origin main
+2. Verify k8s in enabled in docker desktop
+3. Install choco:
+--
+Set-ExecutionPolicy Bypass -Scope Process -Force; `
+[System.Net.ServicePointManager]::SecurityProtocol = `
+[System.Net.ServicePointManager]::SecurityProtocol -bor 3072; `
+iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+---
+3. choco install kubernetes-cli | choco install kubernetes-helm | A GUI for managing clusters: https://k8slens.dev/
+4.
+
+
+
