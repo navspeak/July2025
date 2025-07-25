@@ -3,6 +3,10 @@ git commit -m "first commit"
 git branch -M main
 git remote add origin https://github.com/navspeak/July2025.git
 git push -u origin main
+
+git rm -r --cached **/.idea
+git commit -m "Remove accidentally tracked .idea folders"
+
 2. Verify k8s in enabled in docker desktop
 3. Install choco:
 --

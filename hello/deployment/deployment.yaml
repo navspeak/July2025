@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: demo-hello-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: demo-hello
+  template:
+    metadata:
+      labels:
+        app: demo-hello
+    spec:
+      containers:
+        - name: demo-hello
+          image: demo-hello:latest
+          imagePullPolicy: Never  # For local Docker builds
+          ports:
+            - containerPort: 8080
+
+          # ✅ Environment variables
+          env:
+            - name: SPRING_PROFILES_ACTIVE
+              value: "dev"
+            - name: JAVA_OPTS
+              value: "-Xms256m -Xmx512m"
+
+          # ✅ Readiness probe - app is ready to accept traffic
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            failureThreshold: 3
+
+          # ✅ Liveness probe - app is alive (not stuck)
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 3
