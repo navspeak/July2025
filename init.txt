@@ -16,7 +16,7 @@ Set-ExecutionPolicy Bypass -Scope Process -Force; `
 iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
 ---
 3. choco install kubernetes-cli | choco install kubernetes-helm | A GUI for managing clusters: https://k8slens.dev/
-4.
+4.kubectl get pods -A
 
 
 
