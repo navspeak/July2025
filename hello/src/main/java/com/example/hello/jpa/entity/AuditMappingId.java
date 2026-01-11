@@ -1,4 +1,4 @@
-package com.example.jpa.entity;
+package com.example.hello.jpa.entity;
 
 import java.io.Serializable;
 

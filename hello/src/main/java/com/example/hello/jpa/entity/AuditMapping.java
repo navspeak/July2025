@@ -1,8 +1,8 @@
-package com.example.jpa.entity;
+package com.example.hello.jpa.entity;
 
 import jakarta.persistence.*;
-import lombok.Getter;
-import lombok.Setter;
+import lombok.*;
+import org.springframework.data.domain.Persistable;
 
 import java.time.LocalDateTime;
 
@@ -11,25 +11,39 @@ import java.time.LocalDateTime;
 @IdClass(AuditMappingId.class)
 @Getter
 @Setter
-public class AuditMapping {
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class AuditMapping implements Persistable<AuditMappingId> {
 
     @Id
     @Column(name = "AUDIT_ID")
     private Long auditId;
 
     @Id
-    @Column(name = "TID")
+    @Column(name = "TID", nullable = false)
     private Long tid;
 
-    @Column(name = "CREATED_TIMESTAMP")
-    private LocalDateTime createdTimestamp = LocalDateTime.now();
+    @Column(name = "CREATED_TIMESTAMP", nullable = false)
+    private LocalDateTime createdTimestamp;
 
-    public AuditMapping() {
+    @Transient
+    @Builder.Default
+    private boolean isNew = true;
+
+    @Override
+    public AuditMappingId getId() {
+        return new AuditMappingId(auditId, tid);
     }
 
-    public AuditMapping(Long auditId, Long tid) {
-        this.auditId = auditId;
-        this.tid = tid;
+    @Override
+    public boolean isNew() {
+        return isNew;
+    }
+
+    @PostPersist
+    @PostLoad
+    void markNotNew() {
+        this.isNew = false;
     }
 }
-

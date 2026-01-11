@@ -35,7 +35,8 @@ echo "👉 Using context: $CONTEXT"
 # 🔧 Configure Docker env
 if [[ "$CONTEXT" == "minikube" ]]; then
   echo "🔁 Using Minikube Docker daemon"
-  eval $("$MINIKUBE_CMD" docker-env)
+  echo "$MINIKUBE_CMD" docker-env
+  eval $($MINIKUBE_CMD docker-env --shell bash)
 else
   echo "🐳 Using host Docker (e.g., Docker Desktop)"
 fi
