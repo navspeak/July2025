@@ -1,0 +1,21 @@
+spring:
+  security:
+    oauth2:
+      client:
+        registration:
+          github: # if my callback url was http://localhost:8080/login/oauth2/code/{registerId} (registrationId = github here)
+            client-id: Iv23liAh0oOtMvTNjLye
+            client-secret: b1dbf196014ab58fc8fa24293344b9b2300b240e
+            scope:
+              - public_repo
+        provider:
+          github:
+            authorization-uri: https://github.com/login/oauth/authorize
+            token-uri: https://github.com/login/oauth/access_token
+            user-info-uri: https://api.github.com/user
+            user-name-attribute: login
+logging:
+  level:
+    org.springframework.security: TRACE
+    # Specifically logs the HTTP calls made to the /token endpoint
+    org.springframework.web: DEBUG

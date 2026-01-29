@@ -1,8 +1,6 @@
 package com.example;
 
-import java.util.Comparator;
-import java.util.List;
-import java.util.PriorityQueue;
+import java.util.*;
 
 public class Algo {
 
@@ -64,6 +62,44 @@ public class Algo {
         var l3 = algo.createLL(new int[]{2,6});
         ListNode merged = algo.mergeKLists(new ListNode[]{l1, l2, l3});
         merged.print();
+
+        int[] arr = new int[]{1,2,3, - 1};
+        var len = arr.length;
+
+        List.of().size();
+        "Navneet".length();
+        System.out.println("Navneet".indexOf('e'));
+
+        List<Integer> lst =  new ArrayList<>(List.of(1, 2, 3, 4, 5));
+        System.out.println(lst.indexOf(4));
+        System.out.println(Arrays.toString(lst.subList(1, 3).toArray())); // 2, 3
+        Arrays.sort(arr);
+        System.out.println(Arrays.toString(arr));
+        lst.sort(Comparator.reverseOrder());
+
+        Queue<Integer> q = new ArrayDeque<>(3);
+        System.out.println("Empty- null " + q.poll());
+        try{
+            System.out.println("Empty- Ex " + q.remove());
+        }catch (NoSuchElementException e){
+            System.out.println("NoSuchElementEx");
+        }
+        for (int i : List.of(1,2,3,4,5,6,7,8,9,10)){
+            q.add(i);
+            try {
+                q.add(null);
+                System.out.println(q.offer(null)); // also NPE
+            } catch (NullPointerException e) {
+                System.out.println("NoSuchElementEx");
+            }
+            if (q.size() == 3){
+                System.out.println(Arrays.toString(q.toArray()));
+                System.out.println("Removing " + q.remove()); // no such element execption
+                System.out.println("Removing " + q.poll());
+            }
+        }
+        System.out.println(Arrays.toString(q.toArray()));
+
 
     }
 

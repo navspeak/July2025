@@ -1,6 +1,14 @@
 server:
   port: 8082
 spring:
+  security:
+    oauth2:
+      client:
+        registration:
+          github:
+            client-id: Iv23liAh0oOtMvTNjLye
+            client-secret: b1dbf196014ab58fc8fa24293344b9b2300b240e
+
   datasource:
     url: jdbc:h2:mem:testdb
     driver-class-name: org.h2.Driver
@@ -39,3 +47,6 @@ logging:
     org.hibernate.SQL: DEBUG
     org.hibernate.engine.jdbc.batch.internal.BatchingBatch: DEBUG
     org.hibernate.stat: DEBUG
+    org.springframework.security: TRACE
+
+
