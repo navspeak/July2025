@@ -1,0 +1,114 @@
+-------------------------------------------------------
+                   SCENARIO
+--------------------------------------------------------
+
+OrderService
+→ Concrete class
+→ NO interface
+→ Method annotated with @Transactional
+
+CustomerService
+→ Interface + implementation
+→ Spring bean
+→ Method possibly @Transactional
+
+Controller autowires BOTH
+
+
+=====================================================================
+3) PROXY DECISION (DEFAULT SPRING BEHAVIOR)
+--------------------------------------------------------
+
+For EACH bean, Spring decides ONCE:
+
+Does the bean implement an interface?
+        |
+       YES  ------------------> JDK Dynamic Proxy
+        |
+       NO   ------------------> CGLIB Proxy
+
+
+=====================================================================
+4) WHAT HAPPENS IN YOUR CASE
+--------------------------------------------------------
+
+OrderService (no interface)
+→ MUST use CGLIB proxy
+→ Proxy is subclass of OrderService
+→ @Autowired OrderService works
+→ @Transactional works via CGLIB
+
+CustomerService (has interface)
+→ Uses JDK dynamic proxy (default)
+→ Proxy implements CustomerService
+→ @Autowired CustomerService works
+→ @Transactional works via JDK proxy
+
+
+=====================================================================
+5) RESULT IN CONTROLLER
+--------------------------------------------------------
+
+Controller
+  |
+  +-- orderService      → CGLIB proxy
+  |
+  +-- customerService   → JDK proxy
+
+Both coexist safely.
+This is NORMAL.
+
+
+=====================================================================
+6) AUTOWIRING RULES (IMPORTANT)
+--------------------------------------------------------
+
+JDK Proxy:
+→ Autowire by INTERFACE only
+→ Autowiring implementation may FAIL
+
+CGLIB Proxy:
+→ Autowire by CONCRETE CLASS works
+→ Autowire by interface also works
+
+
+=====================================================================
+7) COMMON LIMITATIONS (BOTH PROXY TYPES)
+--------------------------------------------------------
+
+❌ Self-invocation bypasses AOP
+❌ Private methods not advised
+❌ Must be Spring-managed bean
+❌ Call must go THROUGH proxy
+
+
+=====================================================================
+8) FORCING CONSISTENCY (OPTIONAL)
+--------------------------------------------------------
+
+Force CGLIB everywhere:
+
+spring.aop.proxy-target-class=true
+or
+@EnableAspectJAutoProxy(proxyTargetClass = true)
+
+Result:
+→ All proxied beans use CGLIB
+→ Useful if autowiring concrete classes
+
+
+=====================================================================
+9) FINAL MENTAL MODEL
+--------------------------------------------------------
+
+@Transactional
+→ Pre-built Spring AOP
+
+Logging
+→ Custom AOP (annotation + aspect)
+
+Proxy type
+→ Decided per bean
+→ Interface → JDK
+→ No interface → CGLIB
+

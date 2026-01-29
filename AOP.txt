@@ -1,0 +1,207 @@
+=====================================================================
+                    SPRING AOP / MVC / TRANSACTIONS
+=====================================================================
+
+1) BIG PICTURE – WHAT RUNS WHERE
+--------------------------------
+
+HTTP REQUEST
+   |
+   v
+[ Servlet Filter ]
+   |   (raw HTTP, security headers, CORS, logging)
+   v
+[ DispatcherServlet ]
+   |
+   v
+[ HandlerInterceptor ]
+   |   (authZ, rate limiting, request context)
+   v
+[ @RestController ]
+   |   (HTTP → domain mapping)
+   v
+[ Service Layer (AOP PROXY) ]
+   |   (logging, metrics, transactions)
+   v
+[ Repository / DB ]
+   |
+   v
+Exception?
+   |
+   v
+[ @RestControllerAdvice ]
+   |   (map exception → HTTP 4xx / 5xx)
+   v
+HTTP RESPONSE
+
+
+=====================================================================
+2) WHAT IS *NOT* AOP
+--------------------
+
+@RestControllerAdvice
+@ExceptionHandler
+
+• NOT aspects
+• NOT proxies
+• Part of Spring MVC
+• Runs in DispatcherServlet exception resolution chain
+• Responsible for HTTP status & response body
+
+Use for:
+• 400 / 404 / 500 mapping
+• Validation errors
+• Consistent error responses
+
+
+=====================================================================
+3) WHAT *IS* AOP IN SPRING
+-------------------------
+
+Spring AOP = Method-level interception using PROXIES
+
+Used for:
+• Logging
+• Metrics
+• Transactions
+• Caching
+• Retries
+
+Implemented via:
+• @Aspect
+• @Around / @Before / @After
+• Proxies (JDK or CGLIB)
+
+Runs on:
+• Spring-managed beans
+• Public methods
+• Calls that go THROUGH the proxy
+
+
+=====================================================================
+4) HOW PROXIES ARE CREATED
+--------------------------
+
+Spring decides proxy type PER BEAN:
+
+Does the class implement an interface?
+        |
+       YES  → JDK Dynamic Proxy
+        |
+       NO   → CGLIB Proxy (subclass)
+
+Override default:
+@EnableAspectJAutoProxy(proxyTargetClass = true)
+
+
+=====================================================================
+5) JDK vs CGLIB – PRACTICAL EFFECTS
+----------------------------------
+
+JDK Proxy:
+• Implements interfaces only
+• NOT instance of concrete class
+• Autowire by interface ONLY
+
+CGLIB Proxy:
+• Subclasses concrete class
+• Can autowire concrete class
+• Cannot proxy final classes/methods
+
+Proxy type is chosen ONCE per bean
+Injection site does NOT influence choice
+
+
+=====================================================================
+6) SELF-INVOCATION PROBLEM
+--------------------------
+
+proxy.methodA()
+   ↓
+target.methodA()
+   ↓
+this.methodB()   ← ❌ bypasses proxy
+
+Result:
+• AOP does NOT run on methodB
+
+Applies to:
+• Logging
+• @Transactional
+• @Cacheable
+
+Solution:
+• Call via another bean
+• Refactor
+• Use AspectJ weaving (advanced)
+
+
+=====================================================================
+7) @Transactional – WHY NO @Aspect NEEDED
+-----------------------------------------
+
+@Transactional IS AOP
+
+But:
+• Aspect is PROVIDED by Spring
+• You only declare INTENT
+
+Behind the scenes:
+• TransactionInterceptor (advice)
+• Advisor registered automatically
+• Proxy created automatically
+
+Same limitations as any Spring AOP:
+• Public methods only
+• No self-invocation
+• Must be Spring bean
+
+
+=====================================================================
+8) SPRING AOP vs ASPECTJ
+------------------------
+
+Spring AOP:
+• Proxy-based
+• Method execution only
+• Spring beans only
+• Simple & pragmatic
+
+AspectJ:
+• Bytecode weaving
+• Private / final / constructors
+• Self-invocation works
+• More powerful, more complex
+
+Spring AOP = AspectJ SYNTAX + PROXIES
+AspectJ    = AspectJ SYNTAX + WEAVING
+
+
+=====================================================================
+9) WHEN TO USE WHAT
+-------------------
+
+HTTP error handling?
+→ @RestControllerAdvice (MVC)
+
+Logging / metrics / tx?
+→ Spring AOP
+
+Private/final/self-invocation?
+→ AspectJ (rare)
+
+
+=====================================================================
+10) CORE MENTAL MODEL (LOCK THIS IN)
+-----------------------------------
+
+MVC handles REQUESTS
+AOP handles METHODS
+AspectJ handles BYTECODE
+
+Cross-cutting ≠ AOP by default
+
+
+=====================================================================
+END
+=====================================================================
