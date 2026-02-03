@@ -1,0 +1,113 @@
+What is AQS (AbstractQueuedSynchronizer)?
+================
+ - It’s a framework (not a lock itself) used to build:
+    - ReentrantLock, Semaphore, CountDownLatch, CyclicBarrier, ReadWriteLock, FutureTask
+    - AQS manages thread queuing, blocking, and waking — you define the locking rules.
+
++------------------------------------------------------------------------------------------------------------------+
+| Most high-level concurrency utilities in Java are built on AbstractQueuedSynchronizer,                           |
+| which provides a FIFO wait queue and state-based synchronization, using park/unpark instead of monitor blocking. |
++------------------------------------------------------------------------------------------------------------------+
+
+* synchronized → monitor + BLOCKED
+* AQS → state + queue + park/unpark
+=========================================
+Deadlock with AQS (important nuance)
+===========================================
+* Deadlocks can happen with AQS locks, but:
+    * JVM can’t always detect them
+    * They appear as threads parked forever
+    * You need multiple thread dumps to confirm persistence
+    ----------------------
+    WAITING (parking)
+    at jdk.internal.misc.Unsafe.park
+    at java.util.concurrent.locks.LockSupport.park
+    at java.util.concurrent.locks.AbstractQueuedSynchronizer.acquire
+    -------------
+
+
+AQS Internals: AQS has one integer state and one FIFO queue of waiting threads.
+===============================================================================
+
+                ┌──────────────┐
+                │   state=1    │  ← e.g. lock held (state represents lock permits / counts)
+                └──────────────┘
+                        │
+                        ▼
+          ┌──────────────────────────┐
+          │   CLH FIFO Wait Queue    │  queue => threads waiting to acquire
+          │──────────────────────────│
+          │  [Thread T1 | WAITING]   │
+          │  [Thread T2 | WAITING]   │
+          │  [Thread T3 | WAITING]   │
+          └──────────────────────────┘
+* CLH = Craig, Landin, and Hagersten queue Lock-free FIFO queue algorithm
++-------------------------------------------+
+| JVM Monitor           | AQS CLH Queue     |
+| --------------------- | ----------------- |
+| Entry Set (unordered) | FIFO queue        |
+| JVM-managed           | Java-managed      |
+| BLOCKED               | WAITING (parking) |
+| No fairness           | Optional fairness |
++-------------------------------------------+
+
+Threads that fail to acquire:
+- are enqueued
+- parked using LockSupport.park()
++-------------------------------------------------------+
+| `synchronized`                | AQS-based locks       |
+| ----------------------------- | --------------------- |
+| JVM-managed monitors          | Java-level framework  |
+| BLOCKED state                 | WAITING (parking)     |
+| No timeout                    | `tryLock(timeout)`    |
+| No fairness                   | Fair / unfair         |
+| One condition (`wait/notify`) | Multiple `Condition`s |
++-------------------------------------------------------+
+
+* Look at _3AQSDeadlock:
+========
+Part 1: What changes vs what doesn’t between td1 and td2 (AQS deadlock demo)
+==========================================
+Step 0 — Take two dumps from IntelliJ (fastest)
+    Dump #1 (call it td1)
+        Wait ~10 seconds
+    Dump #2 (td2)
+
+In transient contention, what will change (good sign)
+    Between td1 and td2, you’ll usually see at least one of these:
+        1. Thread state changes
+         - A thread that was WAITING (parking) becomes RUNNABLE (or disappears because it finished)
+        2. Top “your code” frame changes
+            - In td1, it’s stuck at L2.lock() line
+            - In td2, it moved past it (now in business logic / or in a different method)
+        3. The “parking to wait for <0x…>” lock identity changes
+            - This indicates it’s not stuck on one lock forever; it’s moving through different waits
+        4. Different threads are waiting
+            - Contention shifts around; the same exact pair doesn’t remain frozen
+
+In a real deadlock, what will NOT change (bad sign)
+    Between td1 and td2, you’ll see the same invariants:
+        1. Same threads still WAITING (parking) e.g., Thread-A and Thread-B still parked
+        2. Same exact stack shape: You’ll repeatedly see:
+            - Unsafe.park
+            - LockSupport.park
+            - AbstractQueuedSynchronizer.acquire
+            - ReentrantLock.lock
+            - and then your code line where the 2nd lock is requested
+
+        3. Same “your code” line numbers
+                Thread-A stuck at AqsDeadlockDemo.java:18 (say L2.lock())
+                Thread-B stuck at AqsDeadlockDemo.java:34 (say L1.lock())
+
+        4. Same lock identities being waited on
+            Thread-A parked “to wait for <0xLOCK2…>`
+            Thread-B parked “to wait for <0xLOCK1…>If those<0x…>` values remain identical across dumps, that’s very strong evidence of “stuck”.
+
+From td1, you say:
+
+“Suspicious: multiple threads parked in AQS at lock acquisition.”
+
+From td2 (and ideally td3), you conclude:
+
+“Confirmed no progress: same threads, same line, same lock IDs across time → this is effectively deadlocked (or a lock is never released).”
+That “time dimension” is the missing proof that one dump can’t provide.

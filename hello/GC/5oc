@@ -1,0 +1,186 @@
+oc describe deployment <deployment-name> -n <namespace>
+
+Containers:
+  lending-app:
+    Limits:
+      cpu:     1
+      memory:  2Gi
+    Requests:
+      cpu:     500m
+      memory:  1Gi
+==============================================
+1) Which OOME types are sometimes recoverable?
+==============================================
+✅ A) “Heap space” OOME (sometimes recoverable)
+java.lang.OutOfMemoryError: Java heap space
+
+When it can recover
+ > The OOME happens in a request path (e.g., building a big response)
+ > You catch it (or your framework catches it), return 503/500
+ > Traffic drops (or you trip a circuit breaker / rate limit)
+ >  GC runs and frees enough for the process to continue
+        Traffic spike / big allocations => heap hits Xmx => OOME thrown in request => Request fails fast (503) => Load reduces -> GC catches up -> app continues
+
+When it won’t recover
+ > You have a real leak (live set keeps growing)
+ > Even after load drops, memory doesn’t go down
+ > You keep hitting OOME repeatedly until the process is useless
+
+✅ B) “unable to create new native thread” (sometimes recoverable)
+java.lang.OutOfMemoryError: unable to create new native thread
+Cause
+ >Too many threads, or not enough native memory for stacks
+
+How it can recover
+ > Some threads exit
+ > Thread pools stop growing (bounded pools)
+ > Load drops: But usually this indicates a design/ops issue (unbounded thread creation).
+
+⚠️ C) “Metaspace” OOME (rarely recoverable)
+java.lang.OutOfMemoryError: Metaspace
+Usually due to:
+ > dynamic classloading leaks (common with hot-reload tooling, bytecode generation, proxy factories)
+ > mis-sized metaspace
+ > Metaspace is freed only when classloaders are GC’d. If it’s a leak, it won’t recover.
+
+❌ D) “GC overhead limit exceeded” (typically not recoverable)
+java.lang.OutOfMemoryError: GC overhead limit exceeded
+ This means:
+ >JVM is spending most time in GC
+ > reclaiming very little
+
+the system is in a death spiral
+
+It might limp, but operationally it’s “restart me.”
+
+2) What “recovery” actually looks like in a lending API
+Scenario: request creates a big object graph
+
+Example:
+
+a request triggers a fan-out
+
+aggregates large DTOs
+
+accidentally loads too much (e.g., huge list / big PDF / large JSON)
+
+If you handle it well:
+
+the request fails
+
+memory is freed after request scope ends
+
+service returns to normal
+
+ASCII:
+
+Request builds 200MB response object
+       |
+       v
+OOME thrown
+       |
+       v
+Request aborted -> references dropped
+       |
+       v
+GC frees them -> app continues
+
+3) How to make OOME “recoverable” (real techniques)
+A) Fail fast and shed load
+
+Rate limit
+
+Circuit breakers (stop calling downstream)
+
+Return 503 quickly instead of piling more allocations
+
+This prevents “keep allocating into the fire.”
+
+B) Bound memory-heavy things
+
+Limit max payload size
+
+Limit max list sizes / pagination defaults
+
+Bounded thread pools / bounded queues
+
+Cap caches (Caffeine with max size/weight)
+
+C) Keep heap headroom
+
+If you run heap at 95% constantly, any spike tips you into OOME.
+Keep steady-state heap at ~70–80% of Xmx.
+
+D) Restart policy
+
+Even if it “can recover”, many orgs choose:
+
+detect OOME
+
+kill the process intentionally
+
+let OpenShift restart it clean
+
+Why? Because after an OOME, the heap may be fragmented, performance degraded, and you risk repeated failures.
+
+Common practice:
+
+-XX:+ExitOnOutOfMemoryError
+
+
+(or legacy: -XX:+CrashOnOutOfMemoryError)
+
+This turns OOME into a controlled restart instead of limping.
+
+4) OOMKilled is NOT recoverable
+
+Just to contrast:
+
+OOMKilled (cgroup) -> SIGKILL -> process dies immediately
+
+
+No recovery path. It restarts.
+
+ASCII:
+
+Total RSS > limit -> KILL -> restart
+
+5) How it manifests when it “recovers”
+
+You’ll see:
+
+a burst of 500/503 errors
+
+latency spike
+
+then it stabilizes
+
+In logs:
+
+OutOfMemoryError ... (one-off)
+
+
+but the pod stays Running and doesn’t restart.
+
+In Grafana:
+
+heap_used hits Xmx -> errors spike -> heap drops -> back to baseline
+
+
+ASCII:
+
+Heap Used
+|          ██████████  <- hits Xmx
+|        ████████████
+|   ██████
+| ███
++-----------------------> time
+      errors spike
+
+Rule of thumb (bank microservice ops)
+
+If you see one OOME under exceptional payload/traffic and then normal: “recoverable incident”
+
+If you see repeated OOMEs: treat as leak / bad sizing → restart + fix root cause
+
+If you tell me which OOME you saw (heap space vs metaspace vs native thread), I’ll tell you the most likely root cause and the right mitigation in OpenShift.

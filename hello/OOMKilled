@@ -1,0 +1,152 @@
+2️⃣ OpenShift OOMKilled (Kernel OOM Killer)
+When it happens
+==================
+Total process memory > Pod memory limit
+(heap + native)
+==================
+
+⚠️ Heap may NOT be full
+==================
+Native memory grows
+↓
+Total memory crosses cgroup limit
+↓
+Kernel SIGKILLs process
+↓
+No GC, no exception
+==============
+How it manifests
+============
+Process killed instantly
+↓
+Pod restarts
+↓
+Traffic blips
+===============
+What you see in application logs
+==============
+❌ Nothing useful
+No stacktrace
+No OOME
+Logs just stop
+===========
+What you see in pod status
+    oc describe pod <pod>
+
+    Last State:
+      Terminated
+      Reason: OOMKilled
+
+Restart count increments.
+
+What you see in events
+    oc get events
+    Killing container lending-app due to OOM
+
+What you see in Grafana / Prometheus
+=============================
+Container memory
+    container_memory_working_set_bytes ≈ memory limit
+
+
+ASCII:
+
+Container Memory
+|
+|        ██████████████████████  ← hits limit
+|        ██████████████████████
+|        ██████████████████████
++----------------------------------> time
+
+JVM heap
+Heap used may be only 60–70%
+
+
+➡️ This is the confusing part:
+
+“Heap looks fine, but pod died.”
+
+Typical causes
+
+MaxRAMPercentage too high (70–80%)
+
+Netty / WebClient direct buffers
+
+Too many threads (stack memory)
+
+TLS + HTTP/2 buffers
+
+Metaspace growth
+
+JNI / native libs
+
+Side-by-side comparison (bookmark this)
+┌──────────────────────┬──────────────────────────┐
+│ Java OOME            │ OpenShift OOMKilled      │
+├──────────────────────┼──────────────────────────┤
+│ Trigger              │ Heap full                │ Memory limit exceeded
+│ Who kills?           │ JVM                      │ Linux kernel
+│ GC involved?         │ Yes                      │ No
+│ Exception in logs?   │ Yes (OOME)               │ No
+│ Pod restarts?        │ No (usually)             │ Yes
+│ Heap at max?         │ Yes                      │ Maybe not
+│ Fix                  │ Tune heap / code         │ Lower heap %, add headroom
+└──────────────────────┴──────────────────────────┘
+
+How to quickly identify which one happened
+Step 1 — Pod state
+oc describe pod <pod>
+
+
+If you see:
+
+Reason: OOMKilled
+
+
+➡️ Kernel OOM
+
+Step 2 — App logs
+
+If you see:
+
+java.lang.OutOfMemoryError
+
+
+➡️ Java OOME
+
+Step 3 — Grafana dashboard clues
+Symptom	Likely cause
+Heap flat at Xmx	Java OOME
+Container memory hits limit	OOMKilled
+GC pauses spike	Java OOME
+Sudden pod restart	OOMKilled
+Production-grade prevention rules (lending apps)
+Memory sizing
+
+Heap ≤ 55–60% of pod memory limit
+
+Never 75% unless you really know native usage
+
+Monitoring to enable
+
+container_memory_working_set_bytes
+
+jvm_memory_used_bytes
+
+jvm_gc_pause_seconds
+
+pod restart count
+
+Interview-ready summary (use verbatim)
+
+“Java OOME happens when the heap is exhausted and GC can’t reclaim memory; it shows up as an exception and the pod keeps running. OOMKilled happens when total process memory exceeds the pod limit; the kernel kills the process instantly with no Java exception, and the pod restarts.”
+
+If you want next:
+
+A real OOMKilled postmortem walkthrough
+
+Exact PromQL queries for dashboards
+
+How to size heap % safely for Netty vs non-Netty apps
+
+Just say the word.

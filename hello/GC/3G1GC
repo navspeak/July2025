@@ -1,0 +1,6 @@
+-XX:+UseG1GC
+-XX:MaxGCPauseMillis=200
+
+ZGC is not the default because it trades throughput and CPU efficiency for ultra-low latency.
+G1 is more cost-efficient, more forgiving under tight resources, and safer as a general-purpose default.
+ZGC is a specialist GC, not a universal one.

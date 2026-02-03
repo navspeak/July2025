@@ -1,0 +1,83 @@
+                ┌──────────────────────────┐
+                │   Pod Memory Limit (2Gi) │
+                │                          │
+                │  ┌───────────────┐       │
+                │  │   Java Heap   │◄── GC manages this
+                │  │   (Xmx)       │       │
+                │  └───────────────┘       │
+                │  ┌───────────────┐       │
+                │  │ Native Memory │◄── GC CANNOT touch
+                │  │ (meta, stacks │
+                │  │ direct, JIT)  │
+                │  └───────────────┘       │
+                │                          │
+                └──────────────────────────┘
+
+1️⃣ Java OutOfMemoryError (OOME)
+When it happens
+    Java Heap FULL
+    AND
+    GC cannot reclaim enough memory
+    BUT
+    Process is still below pod memory limit
+
+    Heap hits Xmx
+    ↓
+    GC runs (minor / mixed / full)
+    ↓
+    Still not enough free heap
+    ↓
+    JVM throws OOME
+
+How it manifests
+    App is still running
+    ↓
+    Request fails
+    ↓
+    Thread throws exception
+    ↓
+    App may recover OR degrade
+
+What you see in application logs
+    java.lang.OutOfMemoryError: Java heap space
+    or
+    java.lang.OutOfMemoryError: Metaspace
+    or
+    java.lang.OutOfMemoryError: unable to create new native thread
+
+What you see in pod status
+    State: Running
+    Restart Count: unchanged
+
+❗ Pod is NOT restarted automatically (unless your app crashes).
+
+What you see in GC logs
+========================
+    [Full GC] ... allocation failure
+    [GC] ... reclaimed X, still insufficient
+
+    Often followed by:
+    java.lang.OutOfMemoryError
+
+What you see in Grafana / Prometheus
+JVM metrics
+    jvm_memory_used_bytes{area="heap"} ≈ jvm_memory_max_bytes
+
+ Heap Used
+ |
+ |        ████████████████████  ← flat at Xmx
+ |        ████████████████████
+ |        ████████████████████
+ +----------------------------------> time
+
+ GC metrics
+     GC frequency spikes
+     GC duration increases
+     Throughput drops
+     
+  Typical causes
+  
+    Heap leak
+    Cache too large
+    MaxRAMPercentage too high but still below pod limit
+    Metaspace leak (dynamic classloading)

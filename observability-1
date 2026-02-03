@@ -1,0 +1,78 @@
+                     ┌───────────────────────────────────────────┐
+                     │           OpenShift Cluster               │
+                     │                                           │
+                     │   ┌───────────────────────────────────┐   │
+                     │   │           Worker Node             │   │
+                     │   │                                   │   │
+                     │   │   ┌─────────────────────────────┐ │   │
+                     │   │   │        Java App Pod         │ │   │
+                     │   │   │                             │ │   │
+                     │   │   │  ┌───────────────────────┐  │ │   │
+                     │   │   │  │   Java Application    │  │ │   │
+                     │   │   │  │                       │  │ │   │
+                     │   │   │  │  - Event-driven logic │  │ │   │
+                     │   │   │  │  - Downstream calls   │  │ │   │
+                     │   │   │  │                       │  │ │   │
+                     │   │   │  │  Micrometer (library) │  │ │   │
+                     │   │   │  │  -------------------  │  │ │   │
+                     │   │   │  │  - Counters, Timers   │  │ │   │
+                     │   │   │  │  - BUT no exporter    │  │ │   │
+                     │   │   │  │    (no Prometheus)    │  │ │   │
+                     │   │   │  │                       │  │ │   │
+                     │   │   │  │  Logging → stdout     │  │ │   │
+                     │   │   │  │                       │  │ │   │
+                     │   │   │  └──────────┬────────────┘  │ │   │
+                     │   │   │             │               │ │   │
+                     │   │   │  JVM Startup│               │ │   │
+                     │   │   │  includes   │               │ │   │
+                     │   │   │  -javaagent │               │ │   │
+                     │   │   │             │               │ │   │
+                     │   │   │  ┌───────────────────────┐  │ │   │
+                     │   │   │  │ AppDynamics Java Agent│  │ │   │
+                     │   │   │  │                       │  │ │   │
+                     │   │   │  │  - Auto-instruments   │  │ │   │
+                     │   │   │  │    HTTP / Kafka / DB  │  │ │   │
+                     │   │   │  │  - JVM metrics        │  │ │   │
+                     │   │   │  │  - Traces / errors    │  │ │   │
+                     │   │   │  └──────────┬────────────┘  │ │   │
+                     │   │   └─────────────┼─────────────-─┘ │   │
+                     │   │                 │                 │
+                     │   │                 │  APM Telemetry  │
+                     │   │                 │  (out-of-band)  │
+                     │   │                 ▼                 │
+                     │   │        ┌───────────────────────┐  │
+                     │   │        │ AppDynamics Controller|  │
+                     │   │        │                       │  │
+                     │   │        │ - Transactions        │  │
+                     │   │        │ - Dependency maps     │  │
+                     │   │        │ - JVM metrics         │  │
+                     │   │        │ - Error analytics     │  │
+                     │   │        └───────────────────────┘  │
+                     │   │                                   │
+                     │   │   ┌─────────────────────────────┐ │
+                     │   │   │   Log Collector DaemonSet   │ │
+                     │   │   │   (Vector / Fluentd /       │ │
+                     │   │   │    Fluent Bit / Splunk Conn)│ │
+                     │   │   │                             │ │
+                     │   │   │  - Separate process         │ │
+                     │   │   │  - Tails container logs     │ │
+                     │   │   │    (/var/log/containers)    │ │
+                     │   │   │  - Adds k8s metadata        │ │
+                     │   │   │                             │ │
+                     │   │   └──────────┬──────────────────┘ │
+                     │   │              │                     │
+                     │   │              │  Logs (JSON/text)   │
+                     │   │              ▼                     │
+                     │   │   ┌─────────────────────────────┐ │
+                     │   │   │     Log Storage Backends     │ │
+                     │   │   │                             │ │
+                     │   │   │  Elasticsearch / OpenSearch │ │
+                     │   │   │      → Kibana dashboards    │ │
+                     │   │   │                             │ │
+                     │   │   │  Splunk Index               │ │
+                     │   │   │      → Splunk dashboards    │ │
+                     │   │   └─────────────────────────────┘ │
+                     │   │                                   │
+                     │   └───────────────────────────────────┘
+                     │
+                     └───────────────────────────────────────────┘

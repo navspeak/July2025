@@ -1,0 +1,204 @@
+┌──────────────────────────────────────────────────────────┐
+│                    lscpu  (CPU TOPOLOGY)                 │
+└──────────────────────────────────────────────────────────┘
+        |
+        |  shows hardware layout ONLY
+        v
+┌──────────────────────────────────────────────────────────┐
+│ CPU(s):              16   ← logical CPUs (Linux threads) │
+│ Thread(s) per core:   2   ← hyper-threading              │
+│ Core(s) per socket:   8   ← real cores                   │
+│ NUMA node(s):         1   ← memory locality              │
+└──────────────────────────────────────────────────────────┘
+
+Real parallelism = CPU(s) / Threads per core   = 16 / 2 = 8 real cores
+NOTE: It does NOT know about Kubernetes limits, about container throttling
+
+┌──────────────────────────────────────────────────────────┐
+│               MULTITHREADING SCENARIO                    │
+└──────────────────────────────────────────────────────────┘
+
+Application logic: "OS says I have 16 CPUs → create 16 threads"
+
+But reality: Only 8 real cores exist
+
+Result:
+┌──────────────┐      ┌──────────────┐
+│ Thread 1     │◀────▶│ Thread 2     │  (same core)
+└──────────────┘      └──────────────┘
+       ▲                      ▲
+       │ context switch       │
+       ▼                      ▼
+┌──────────────┐      ┌──────────────┐
+│ Thread 3     │◀────▶│ Thread 4     │  (same core)
+└──────────────┘      └──────────────┘
+
+┌──────────────────────────────────────────────────────────┐
+│                    SYMPTOMS IN PROD                      │
+└──────────────────────────────────────────────────────────┘
+
+• CPU not at 100%
+• Throughput lower than expected
+• Latency spikes
+• Adding threads makes it worse
+• No deadlocks, no errors
+• GC pauses increase (JVM apps)
+
+Root cause:
+Too many threads fighting for the same cores
+RULE: Size CPU-bound thread pools to number of physical cores, not logical CPUs
+      physical cores = CPU(s) / Thread(s per core)
+┌──────────────────────────────────────────────────────────┐
+│            KUBERNETES CONTAINER SCENARIO                 │
+└──────────────────────────────────────────────────────────┘
+
+deployment.yaml:
+resources:
+  limits:
+    cpu: "2"
+
+Host machine:
+CPU(s): 16   ← lscpu still shows this
+
+Reality:
+Container allowed CPU time = 2 cores
+Visible CPUs               = 16
+
+Use container-aware JVM flags (Java 10+ mostly auto, but verify):
+-XX:ActiveProcessorCount=2
+
+
+┌──────────────────────────────────────────────────────────┐
+│            WHAT THE APP *THINKS* vs REALITY              │
+└──────────────────────────────────────────────────────────┘
+
+App thinks:
+┌─────────────────────────┐
+│ 16 CPUs → 16 threads    │
+└─────────────────────────┘
+
+Reality:
+┌─────────────────────────┐
+│ Only 2 CPUs worth time  │
+└─────────────────────────┘
+
+Effect:
+16 threads share 2 CPUs
+→ heavy context switching
+→ cache thrashing
+→ latency + slowdown
+
+┌──────────────────────────────────────────────────────────┐
+│                CLASSIC PROD SCENARIOS                    │
+└──────────────────────────────────────────────────────────┘
+
+[Scenario 1]
+Kafka consumers slow
+→ partitions not scaling
+→ CPU < 80%
+→ root cause: oversubscribed threads
+
+[Scenario 2]
+Spring Cloud Gateway slow
+→ Netty event loops = CPU count
+→ throttled by k8s
+→ tail latency spikes
+
+[Scenario 3]
+JVM GC pauses inconsistent
+→ GC threads sized too high
+→ CPU throttling
+→ stop-the-world feels random
+
+┌──────────────────────────────────────────────────────────┐
+│                     CORE TAKEAWAYS                       │
+└──────────────────────────────────────────────────────────┘
+
+• lscpu shows HARDWARE, not limits
+• Threads per core reveals oversubscription risk
+• CPU limits throttle TIME, not visibility
+• Too many threads ≠ faster
+• Explicit CPU sizing avoids surprises
+
+=======================
+┌──────────────────────────────────────────────────────────┐
+│                   CPU CACHE HIERARCHY                    │
+└──────────────────────────────────────────────────────────┘
+
+        ┌──────────────┐
+        │     L1       │  ← smallest, FASTEST
+        │  (per core)  │     ~1 ns
+        └──────┬───────┘
+               │
+        ┌──────▼───────┐
+        │     L2       │  ← per core (or small shared)
+        │  (per core)  │     ~4–5 ns
+        └──────┬───────┘
+               │
+        ┌──────▼───────┐
+        │     L3       │  ← shared across all cores
+        │   (shared)   │     ~10–20 ns
+        └──────┬───────┘
+               │
+        ┌──────▼───────┐
+        │    RAM       │  ← VERY slow
+        │              │     ~100 ns+
+        └──────────────┘
+
+Key fact:
+• L1 and L2 caches belong to a *core*
+• Threads running on the same core SHARE these caches
+==============================================
+1️⃣ What is Cache Thrashing (in simple points)
+==============================================
+
+Each CPU core has small, fast caches (L1, L2). Threads rely on these caches to be fast
+When too many threads run on the same core:
+    - Each thread loads its own data into cache -> That data kicks out the previous thread’s data
+    - When a thread runs again -> Its data is gone -> CPU must fetch from L3 or RAM (slow)
+👉 This constant evict → reload → evict cycle is cache thrashing
+* CPU is busy waiting on memory. Not doing useful work. More threads = worse performance
+* Latency becomes unpredictable.
+* You can have low CPU usage and still be slow
+* get from lscpu:
+    CPU(s) = x = 16
+    Thread(s) per core = y = 2
+    ---------
+    real cores = x / y = 8
+
+If your app has:
+    Executor threads > real cores
+    Netty event loops = logical CPUs
+    Kafka consumers × threads > real cores
+    ⚠️ High risk of cache thrashing
+
+How to FIX cache thrashing (practical)
+===================
+Fix 1: Reduce thread count (most effective) Size CPU-bound thread pools to number of real cores. Not logical CPUs.
+Fix 2: Tell JVM the real CPU count.In containers: -XX:ActiveProcessorCount=2.Prevents JVM from creating too many threads.
+Fix 3: Separate CPU-bound and IO-bound threads CPU-bound → limited threads.IO-bound → more threads allowed. This avoids CPU cache contention.
+Fix 4: Avoid false sharing (advanced)
+    - Don’t share hot variables between threads
+    - Pad frequently updated fields
+    - Use thread-local data where possible
+(This reduces cache line bouncing.)
+
+Cache thrashing occurs when more threads than CPU cores compete for small per-core caches, causing constant cache eviction and memory stalls;
+lscpu helps by revealing real core count so thread pools can be sized correctly.
+
+-------------------------------------------------------------------------------
+False sharing happens when multiple threads update different variables that happen to live on the same CPU cache line,
+causing unnecessary cache invalidations and slowing the program down — even though the variables are not logically shared.
+-------------------------------------------------------------------------------
+https://www.youtube.com/watch?v=tLS85IfsbYE
+------------
+Who should care?
+    Framework / library / JVM developers / Low-latency, CPU-bound systems (Netty, Kafka, trading, metrics)
+    Very high-throughput counters or tight loops
+    Most application developers do not need to worry about it.
+
+What should be done?
+Application developers:
+    Use high-level tools (LongAdder, avoid shared mutable state, size thread pools correctly).
+Library / systems developers:
+    Control memory layout (padding, @Contended) where proven necessary.

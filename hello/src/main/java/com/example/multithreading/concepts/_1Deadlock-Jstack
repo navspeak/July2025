@@ -1,0 +1,97 @@
+When one dump is enough ✅
+==============================
+* True monitor deadlock (synchronized)
+* jstack will usually print an explicit section:
+    Found one Java-level deadlock: (banner)
+* Obvious lock cycle visible in the text
+    Even without the banner, you might clearly see:
+    - Thread A: BLOCKED → waiting to lock <0x123> which is locked by Thread B
+    - Thread B: BLOCKED → waiting to lock <0x456> which is locked by Thread A
+    That’s also definitive from one dump.
+===============================
+    Thread A:
+      owns  → Monitor M2 (<0x456>)
+      waits → Monitor M1 (<0x123>)  ← owned by Thread B
+
+    Thread B:
+      owns  → Monitor M1 (<0x123>)
+      waits → Monitor M2 (<0x456>)  ← owned by Thread A
+
+    This cycle is the deadlock.
+          ┌─────────────────────────┐
+          │  Monitor M1  (<0x123>)  │
+          │-------------------------│
+          │ Owner     : Thread B    │
+          │ Entry Set : Thread A    │  ← BLOCKED trying to enter
+          │ Wait Set  : (empty)     │
+          └─────────────────────────┘
+                      ▲
+                      │
+                      │  Thread A wants M1
+                      │
+          ┌─────────────────────────┐
+          │  Monitor M2  (<0x456>)   │
+          │-------------------------│
+          │ Owner     : Thread A    │
+          │ Entry Set : Thread B    │  ← BLOCKED trying to enter
+          │ Wait Set  : (empty)     │
+          └─────────────────────────┘
+                      ▲
+                      │
+                      │  Thread B wants M2
+                      │
+===================
+
+When one dump is not enough ⚠️
+------------------------------------
+
+It’s not a deadlock; it’s just “blocked right now”
+A single snapshot can show threads BLOCKED, but they might unblock 2 ms later. You can’t know from one snapshot whether it’s permanent.
+
+Deadlock involving java.util.concurrent locks
+With ReentrantLock / AbstractQueuedSynchronizer, jstack may show:
+
+WAITING (parking)
+
+frames like Unsafe.park, LockSupport.park, AQS.acquire
+That could be:
+
+normal contention,
+
+long wait,
+
+or an actual deadlock cycle.
+One dump often can’t prove it.
+
+Distributed “deadlock”
+If threads are waiting on:
+
+network I/O,
+
+DB calls,
+
+Kafka,
+
+remote services,
+it can look like a deadlock but isn’t a JVM lock deadlock.
+
+The practical rule
+
+If jstack prints “Found one Java-level deadlock” → one dump is enough.
+
+Otherwise, one dump only tells you the current state, not whether it will resolve.
+
+That’s why people take 2–3 dumps spaced out: persistence across time is the giveaway.
+
+What multiple dumps proves
+
+If the same threads show the same:
+
+state (BLOCKED / WAITING (parking))
+
+“waiting on …”
+
+same lock addresses / same owner threads
+across all dumps → it’s effectively stuck (deadlock or permanent contention).
+
+If you want, paste a small snippet for one stuck thread (state + the “waiting/locked” lines + top ~10 stack frames) and I’ll tell you which of these buckets it falls into.

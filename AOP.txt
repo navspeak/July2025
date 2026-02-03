@@ -201,7 +201,28 @@ AspectJ handles BYTECODE
 
 Cross-cutting ≠ AOP by default
 
+11) JDK Proxy vs
+class $Proxy12 implements I {
+  InvocationHandler handler;
 
+  public void x() {
+    handler.invoke(this, methodX, args);
+  }
+}
+
+class A$$CglibProxy extends A  {
+
+  MethodInterceptor callback;
+
+  @Override
+  public void x() {
+    callback.intercept(this, methodX, args, methodProxyX);
+  }
+
+  @Override
+  public void y() {
+    callback.intercept(this, methodY, args, methodProxyY);
+  }
 =====================================================================
 END
 =====================================================================

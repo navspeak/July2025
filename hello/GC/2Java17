@@ -1,0 +1,31 @@
+In Java 17, these GC options are valid (i.e., recognized by the JVM in standard OpenJDK builds):
+
+✅ Common, production collectors
+
+G1GC (default in Java 17)
+-XX:+UseG1GC
+
+Parallel GC (Throughput GC)
+-XX:+UseParallelGC
+
+Serial GC (single-threaded, small heaps)
+-XX:+UseSerialGC
+
+✅ Low-latency collectors (also valid in Java 17)
+
+ZGC (concurrent, low pause)
+-XX:+UseZGC
+
+Shenandoah (concurrent, low pause)
+-XX:+UseShenandoahGC
+Note: Available in many OpenJDK distributions; some vendor builds may omit it, but if your JVM supports it, this flag is valid.
+
+✅ Special-purpose
+
+Epsilon GC (no-op GC; for testing)
+-XX:+UseEpsilonGC
+
+❌ Not valid in Java 17
+
+CMS (Concurrent Mark Sweep) — removed (you’ll get “Unrecognized VM option”)
+-XX:+UseConcMarkSweepGC ❌

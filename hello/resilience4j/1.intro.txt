@@ -1,0 +1,49 @@
+Step 1: What problem does Resilience4j solve? (Big picture)
+================================================================
+In microservices, your service often calls other services (REST, GraphQL, DB, Kafka, etc.).
+When a downstream service:
+- is slow
+- is down
+- starts timing out
+- intermittently fails
+
+👉 your service can:
+- block threads
+- cascade failures
+- cause timeouts upstream
+- trigger retries → even more load (thundering herd)
++-------------------------------------------------------------------------------+
+|   Resilience4j adds protective wrappers around such calls.                    |
+|   Think of it as defensive infrastructure code, but done declaratively.       |
++-------------------------------------------------------------------------------+
+
+    Your Service -> [ Resilience4j ] -> Downstream API
+
+Resilience4j decides:
+
+❌ Should I even call the downstream?
+⏱️ How long should I wait?
+🔁 Should I retry?
+🧯 Should I fail fast and use fallback?
+
+What Resilience4j gives you (high level)
+----------------------------------------
+Circuit Breaker → stop calling a failing service
+Retry → retry transient failures
+TimeLimiter → fail if call takes too long
+Bulkhead → limit concurrent calls
+RateLimiter → limit request rate
+
+Why teams like it (vs Netflix Hystrix)
+------------------------------------
+Lightweight (no thread pools forced)
+Pure Java (functional style)
+Spring-friendly annotations
+Actuator + Micrometer support
+
+
+
+
+
+No file chosenNo file chosen
+ChatGPT can make mistakes. Check important info. See Cookie Preferences.

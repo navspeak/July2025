@@ -1,0 +1,55 @@
+<dependency>
+  <groupId>org.springframework.boot</groupId>
+  <artifactId>spring-boot-starter-aop</artifactId>
+</dependency>
+
+<dependency>
+  <groupId>io.github.resilience4j</groupId>
+  <artifactId>resilience4j-spring-boot3</artifactId>
+</dependency>
+
+<!-- optional but very useful to see states + metrics -->
+<dependency>
+  <groupId>org.springframework.boot</groupId>
+  <artifactId>spring-boot-starter-actuator</artifactId>
+</dependency>
+
+
+spring-boot-starter-aop → enables annotation-based interception (@CircuitBreaker)
+resilience4j-spring-boot3 → Spring Boot 3 integration (auto-config + annotations)
+actuator (optional) → exposes health/metrics endpoints so you can see breaker state
+
+===========
+resilience4j:
+  circuitbreaker:
+    instances:
+      orderService:
+        slidingWindowType: COUNT_BASED
+        slidingWindowSize: 5
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10s
+        permittedNumberOfCallsInHalfOpenState: 2
+  retry:
+    instances:
+      orderServiceRetry:
+        max-attempts: 3
+        wait-duration: 500ms
+        retry-exceptions:
+          - java.io.IOException
+          - java.util.concurrent.TimeoutException
+        ignore-exceptions:
+          - com.myapp.BadRequestException
+
+| Setting                                    | Meaning                             |
+| ------------------------------------------ | ----------------------------------- |
+| `orderService`                             | Logical name of the circuit breaker |
+| `slidingWindowSize: 5`                     | Look at last 5 calls                |
+| `failureRateThreshold: 50`                 | If ≥50% fail → OPEN                 |
+| `waitDurationInOpenState: 10s`             | Stay OPEN for 10 seconds            |
+| `permittedNumberOfCallsInHalfOpenState: 2` | Test with 2 calls after cool-down   |
+
+CLOSED  --> failures -->  OPEN
+  ^                        |
+  |                        | after waitDuration
+  |                        v
+  +----- success ---- HALF_OPEN

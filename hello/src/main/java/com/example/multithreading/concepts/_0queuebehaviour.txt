@@ -1,0 +1,82 @@
+1️⃣ Queue (non-blocking, no waiting)
+======================================
+Examples:
+1. ArrayDeque
+2. LinkedList
++----------------------------------------------------------------+
+|                 Methods & behavior                             |
++----------------------------------------------------------------+
+| Method	      |   Empty queue 	| Full queue (bounded impl)  |
++----------------------------------------------------------------+
+| add(e)	                OK	          ❌ throws exception    |
+| offer(e)	                OK	             returns false       |
+| remove()	       ❌ throws exception	  OK                     |
+| poll()	          returns null	      OK                     |
+| peek()	          returns null	      OK                     |
++----------------------------------------------------------------+
+
+2️⃣ BlockingQueue (what your buffer is closest to)
+==================================================
+Examples:
+1. ArrayBlockingQueue - Bounded
+2. LinkedBlockingQueue - unbounded (practically)
+3. SynchronousQueue - capacity = 0 => producer blocks until take & consumer blocks until put
+
++----------------------------------------------------------------+
+| Method        | Empty queue            | Full queue             |
+| ------------- | ---------------------  | ---------------------  |
+| `put(e)`      | ✅ **does NOT block**  | ⛔ **blocks**          |
+| `take()`      | ⛔ **blocks**          | ✅ **does NOT block**  |
+| `offer(e)`    | ✅ returns `true`      | ❌ returns `false`     |
+| `poll()`      | ❌ returns `null`      | ✅ returns element     |
+| `offer(e, t)` | ✅ returns immediately | ⏳ waits up to timeout |
+| `poll(t)`     | ⏳ waits up to timeout | ✅ returns immediately |
++----------------------------------------------------------------+
+
++----------------------------------------------------------------+
+| Pair           | Behavior                                         |
+| -------------- | ------------------------------------------------ |
+| `add / remove` | Non-blocking, exception-based                    |
+| `offer / poll` | Non-blocking (value-based) **or timed-blocking** |
+| `put / take`   | Blocking (indefinite)                            |
++-------------------------------------------------------------------+
+
+✅ Key takeaway:
+
+As queue (FIFO): use offer() / poll() / peek().
+As stack (LIFO): use push() / pop() / peek().
+Same data structure (Deque) → different usage patterns.
+
+====================================================================
+LinkedBlockingQueue = classic queue with capacity semantics
+====================================================================
+* Typical producer/consumer queue.
+* Has an optional capacity bound (you can create it bounded).
+* Uses two locks internally (one for put, one for take) + conditions → good concurrency.
+* Usually a great default for pipelines.
+
+====================================================================
+LinkedTransferQueue = queue + “direct handoff” capability
+====================================================================
+* Implements TransferQueue, which adds handoff operations:
+* transfer(e) → blocks until some consumer actually receives e
+* tryTransfer(e) / timed transfer variants
+* Even normal put/offer can behave efficiently under contention.
+* Great when you want low-latency handoff or producers to sometimes wait for consumers (backpressure) without bounding capacity.
+
+Pick LinkedTransferQueue when:
+==============================
+You want producers to sometimes wait until a consumer receives the item (transfer)
+You care about low-latency handoff and high throughput under contention
+You’re implementing something like a dispatcher where direct delivery is useful
+
+A tiny example to feel the difference
+====================================================================
+    LinkedBlockingQueue: producer never waits (unbounded default)
+    BlockingQueue<Integer> q = new LinkedBlockingQueue<>();
+    q.put(1);          // practically never blocks
+====================================================================
+    LinkedTransferQueue: producer can force handoff
+    LinkedTransferQueue<Integer> q = new LinkedTransferQueue<>();
+    q.transfer(1);     // blocks until some consumer takes it
+====================================================================

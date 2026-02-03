@@ -1,0 +1,154 @@
+Prod-ready” jstack checklist for a hung JVM (deadlock vs starvation vs IO)
+============================================
+Step 1 — Confirm “is the JVM actually stuck?”
+============================================
+* Request symptoms: latency exploding, throughput near 0, errors/timeouts rising
+* Thread pool symptoms: all worker threads busy/blocked, queue growing
+* CPU clue:
+    * CPU low/idle + requests hung → often deadlock / lock wait / IO wait
+    * CPU high → might be hot loop or GC pressure (different path)
+(You can do the CPU check via top/htop in Linux or container metrics in k8s/OpenShift.)
+
+============================================
+Step 2 — Take 3 thread dumps (time dimension)
+============================================
+
+This is the core move.
+
+    jstack <pid> > td1.txt
+    sleep 10
+    jstack <pid> > td2.txt
+    sleep 10
+    jstack <pid> > td3.txt
+
+============================================
+Step 3 — First quick scan (the “big 3”)
+============================================
+A) Look for explicit monitor deadlock
+Search in each dump for:
+* Found one Java-level deadlock:
+If present → done. You have a confirmed monitor deadlock from one dump.
+
+============================================
+B) Count threads by state
+============================================
+Skim for many threads in:
+    BLOCKED → monitor contention / possible deadlock
+    WAITING (parking) → AQS locks, latches, thread pools
+    RUNNABLE but doing native IO → can still be “stuck” (socket read)
+
+============================================
+C) Find the request threads / worker threads
+============================================
+Look for names like:
+    http-nio-8080-exec-* (Tomcat)
+    reactor-http-nio-* (Netty/Reactor)
+    your custom executors (pool-*, ForkJoinPool, etc.)
+
+============================================
+Step 4 — Decide which bucket you’re in
+============================================
+
+Bucket 1: Monitor deadlock (synchronized) ✅
+--------
+Signature:
+    * BLOCKED (on object monitor)
+    * lines like:
+    - waiting to lock <0x...>
+    - locked <0x...>
+often with the explicit deadlock banner
+Conclusion: deadlock (even from one dump if banner is there).
+
+Bucket 2: AQS lock deadlock or permanent lock wait (ReentrantLock / RWLock) ⚠️
+---------
+Signature in dumps:
+lots of threads show:
+    * WAITING (parking)
+    * Unsafe.park
+    * LockSupport.park
+    * AbstractQueuedSynchronizer.acquire
+    * ReentrantLock.lock / ReadWriteLock.writeLock().lock etc.
+    * then your app frame com.yourapp...:line
+
+How to conclude:
+    * compare td1 vs td2 vs td3
+    * If the same threads are parked at the same lock call sites (same line numbers) across dumps → no progress.
+    * Then determine which of these two sub-causes:
+    2A) Circular wait (classic deadlock)
+        Two or more threads each stuck trying to acquire a “second lock”
+        Often each thread’s top app frame is a lock() call, in different places
+        Pattern persists across dumps
+    2B) Lock never released (bug)
+        Many threads waiting for the same lock acquisition line
+        But you cannot find evidence of anyone making progress / unlocking
+        Often caused by missing unlock() in a finally, or exception path
+
+Pragmatic conclusion in prod:
+    The JVM is stuck on AQS lock acquisition with no progress across time; treat as deadlock/permanent lock wait.
+
+Bucket 3: Thread pool starvation / self-deadlock (very common!)
+------
+This one is sneaky and looks like deadlock.
+Signature:
+    Many threads are waiting on futures:
+    CompletableFuture.join/get
+    FutureTask.get
+    CountDownLatch.await
+
+* Those futures depend on tasks scheduled onto the same exhausted pool
+    Example smell:
+        All pool-1-thread-* are blocked waiting for work that must run on pool-1-*
+How to conclude:
+    In dumps, pool threads are blocked on waits, and there are no free threads to run queued tasks.
+    Often the same across multiple dumps.
+    Fix (later) is: separate pools, avoid blocking joins inside pool threads, use async composition, etc.
+
+Bucket 4: IO hang / downstream dependency
+------
+Signature:
+    * Threads in:
+       java.net.SocketInputStream.socketRead0
+       HTTP client calls (Apache, OkHttp, Netty)
+       JDBC driver reads
+       Many request threads blocked waiting on remote calls
+
+Conclusion:
+Not a JVM deadlock; it’s an external dependency or missing timeout.
+
+Next step:
+    verify client timeouts
+    check downstream health
+    look for connection pool exhaustion
+=================================
+Step 5 — The “grep” moves that save time
+=================================
+When you have td1.txt / td2.txt / td3.txt, search for:
+
+AQS waits:
+    AbstractQueuedSynchronizer
+    LockSupport.park
+    Unsafe.park
+    ReentrantLock
+    ReentrantReadWriteLock
+
+Blocking waits / starvation:
+    CompletableFuture.get
+    CompletableFuture.join
+    FutureTask.get
+    CountDownLatch.await
+    ForkJoinPool
+
+IO waits:
+    socketRead0
+    SSLSocket
+    HttpClient
+    okhttp
+    JDBC classes
+
+Your code:
+    com.yourcompany. (whatever your package root is)
+
+=================================
+Step 6 — Your final incident statement template
+=================================
+he first dump showed multiple worker threads parked in AQS at lock acquisition points. I took two more dumps 10 seconds apart and the same threads were parked at the same code lines with no progress, which confirms a permanent lock wait consistent with an AQS deadlock or a lock not being released. Next I’d identify the locking order / missing unlock and apply ordering or tryLock-timeout patterns.

@@ -1,0 +1,125 @@
+1️⃣ Classic Generational Heap (Serial / Parallel / CMS-style)
+========================================================================
+Heap layout
+Heap
+ ├── Young Generation
+ │    ├── Eden
+ │    ├── Survivor S0
+ │    └── Survivor S1
+ └── Old / Tenured Generation
+
+Object lifecycle
+- New objects → Eden
+- Minor GC:
+    - Live objects copied Eden → S0/S1
+    - Age incremented
+When age ≥ -XX:MaxTenuringThreshold → promoted to Old Gen
+
+2️⃣ GC Phases (Mark / Sweep / Compact)
+========================================================================
+Phase	Meaning
+-------------------------
+Mark	Find live objects
+Sweep	Reclaim dead objects
+Compact	Defragment heap
+-------------------------
+
+⚠️ Note:
+- Sweep ≠ Delete individual objects
+    It reclaims regions of dead memory
+- Compaction may or may not happen depending on collector
+
+3️⃣ Minor vs Major GC
+------------------------------------------------
+GC Type 	Scope	            STW
+------------------------------------------------
+Minor GC	Young Gen only	    Yes
+Major GC	Old Gen	Usually     Yes
+Full GC	    Entire Heap	        Yes (long)
+------------------------------------------------
+
+When old generation is full ⇒ Major / Full GC
+✔️ Yes (especially for Serial / Parallel)
+
+4️⃣ Stop-The-World (STW)
+Threads paused -> GC runs -> Resume
+But duration differs massively by collector.
+
+5️⃣ Collector Types — Corrections & Clarifications
+========================================================================
+🧵 Serial GC ->Single-threaded -> STW for everything -> Small heaps / dev / embedded
+⚡ Parallel GC (Throughput GC) -> Multi-threaded GC -> Still STW -> Optimized for throughput, not latency
+🧠 Concurrent Collectors (CMS / G1 / ZGC / Shenandoah)
+    >> Concurrent collectors do most work concurrently, but still require short STW phases (initial mark, remark, etc.)
+
+6️⃣ G1GC — This Is Where the Model Changes 🔥
+========================================================================
+❌ What no longer exists physically
+
+In G1GC, the heap is NOT physically divided like this:
+
+❌ Young Gen (Eden + S0 + S1)
+❌ Old Gen
+
+That layout does NOT exist as fixed memory areas.
+
+✅ G1GC Heap Model
+Heap
+ ├── Region 1
+ ├── Region 2
+ ├── Region 3
+ ├── ...
+ ├── Region N
+
+
+Heap split into equal-sized regions (1–32 MB)
+Each region can dynamically be:
+    Eden
+    Survivor
+    Old
+    Humongous
+
+📌 Role is logical, not physical
+Young Gen in G1GC (Logical, not fixed)
+At any moment:
+==================================================
+Young Gen = { Eden regions + Survivor regions }
+Old Gen   = { Old regions }
+================================================
+
+➡️ But:
+These are just labels
+Regions can change roles between cycles
+
+
+7️⃣ G1GC Collection Behavior (Your Best Part 💯)
+
+It divides heap into different regions and during a GC it can collect a subset of regions
+
+✔️ 100% correct
+
+Regions with most garbage will be collected first
+
+✔️ Exactly — hence the name Garbage First
+
+How G1 decides what to collect
+ - Tracks live-data density per region
+ - Builds a collection set (CSet)
+ - Picks regions with:
+    - High garbage
+    - Within pause-time goal (-XX:MaxGCPauseMillis)
+
+8️⃣ Major GC in G1GC (Important Correction)
+
+When old generation full ⇒ Major GC
+
+❌ Not strictly true for G1
+
+In G1:
+There is no “old-gen full → stop the world” rule
+G1 performs:
+ - Mixed GC (Young + some Old regions)
+ - Concurrent marking
+Full GC is last resort
+✔️ G1 tries very hard to avoid Full GC
+

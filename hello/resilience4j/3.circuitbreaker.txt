@@ -1,0 +1,36 @@
+@Service
+public class OrderService {
+
+    @CircuitBreaker(
+        name = "orderService",
+        fallbackMethod = "fallback"
+    )
+    public String placeOrder(String orderId) {
+        // simulate downstream call
+        if (Math.random() < 0.7) {
+            throw new RuntimeException("Downstream service failed");
+        }
+        return "Order placed: " + orderId;
+    }
+
+    // fallback MUST match signature (+ Throwable at end)
+    public String fallback(String orderId, Throwable ex) {
+        return "Order service unavailable. Please try later.";
+    }
+}
+
+What is happening (step-by-step)
+    Spring creates a proxy around OrderService
+    Call hits the proxy first (AOP)
+    Resilience4j checks circuit state:
+    CLOSED → call real method
+    OPEN → skip method, go directly to fallback
+    HALF_OPEN → allow limited test calls
+    Exceptions are recorded as failures
+    Failure rate crosses threshold → circuit opens
+
+Very important rules
+    Circuit breakers work on exceptions
+    No exception = success
+    Wrong fallback signature = runtime error
+    Name (orderService) must match config

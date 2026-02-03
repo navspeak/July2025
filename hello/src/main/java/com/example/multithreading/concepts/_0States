@@ -1,0 +1,22 @@
+🧠 Summary of States
+=======================
+Method Used                        	Thread State of Caller
+join()	                            WAITING
+join(timeout)	                    TIMED_WAITING
+sleep(timeout)	                    TIMED_WAITING
+wait()	                            WAITING
+wait(timeout)	                    TIMED_WAITING
+LockSupport.park()	                WAITING
+LockSupport.parkNanos()	            TIMED_WAITING
+
+
+=========
+this = thread class instance. Join is a method on thread class. isAlive => native
+public final void join() throws InterruptedException {
+    synchronized (this) {
+        while (isAlive()) {
+            wait();
+        }
+    }
+}
+=========

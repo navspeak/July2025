@@ -1,0 +1,24 @@
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
+
+
+
+1. Health endpoint (includes Resilience4j circuit breaker health indicators)
+        GET /actuator/health
+    You’ll see something like:
+        circuit breaker state (CLOSED / OPEN / HALF_OPEN)
+        failure rate info (depends on version/config)
+
+2. Metrics endpoint (raw counters/timers)
+        GET /actuator/metrics
+
+3.You can also query a specific metric like:
+    GET /actuator/metrics/resilience4j.circuitbreaker.calls
+
+(Exact metric names can vary a bit by version, but resilience4j.circuitbreaker.* is the pattern.)

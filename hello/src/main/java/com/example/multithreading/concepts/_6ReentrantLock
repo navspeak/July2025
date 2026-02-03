@@ -1,0 +1,67 @@
+| Method                | Blocks        | Interruptible |
+| --------------------- | ------------- | ------------- |
+| `lock()`              | Yes           | ❌ No          |
+| `lockInterruptibly()` | Yes           | ✅ Yes         |
+| `tryLock()`           | No            | ❌ No          |
+| `tryLock(timeout)`    | Yes (bounded) | ✅ Yes         |
+
+
+| Aspect           | `synchronized` | `ReentrantLock`    |
+| ---------------- | -------------- | ------------------ |
+| Reentrant        | ✅ Yes          | ✅ Yes           |
+| Owner tracked    | JVM            | Java object        |
+| Hold count       | Hidden         | Visible            |
+| Unlocking        | Automatic      | Manual             |
+| Mis-unlock risk  | Impossible     | Possible           |
+| Condition queues | One (`wait`)   | Many (`Condition`) |
+| Fairness         | No             | Optional           |
+
+===========Re-entrant behavior w/Synch ================
+synchronized (obj) {
+    foo();
+}
+
+synchronized (obj) {
+    bar();
+}
+✔ Safe — compiler + JVM guarantee correctness.
+==============================
+
+===========Re-entrant behavior lock ================
+lock.lock();
+foo();
+lock.lock();   // reentrant
+bar();
+lock.unlock(); // count = 1
+lock.unlock(); // count = 0 → released
+✔ Works — but only if unlock count matches.
+❌ Miss one unlock() → permanent lock leak.
+========================
+
+====================
+ReentrantLock lock = new ReentrantLock();
+
+lock.lock();        // holdCount = 1
+lock.lock();        // holdCount = 2
+
+System.out.println(lock.getHoldCount()); // 2
+
+lock.unlock();      // holdCount = 1
+lock.unlock();      // holdCount = 0 → lock released
+=======
+
+================
+boolean acquired = lock.tryLock();
+try {
+    if (!acquired) {
+        return;
+    }
+    process();
+} finally {
+    if (lock.isHeldByCurrentThread()) {
+        lock.unlock();
+    }
+}
+unlock() must be called only by the owning thread
+Calling unlock() from a non-owner thread → IllegalMonitorStateException
+===============

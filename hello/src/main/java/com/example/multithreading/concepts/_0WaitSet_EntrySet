@@ -1,0 +1,162 @@
+https://github.com/navspeak/June2025BrushUp/tree/master/src/main/java/com/example/demo/multithreading
+
+“Moved to BLOCKED” — what exactly happens?
+===================================================
+When a thread calls wait() inside synchronized(buffer):
+-------------------------------------------------------
+* It releases the monitor lock on buffer
+* It transitions to the state WAITING
+* It is placed into the object’s Wait Set (conceptually)
+
+Then someone calls notifyAll() (also inside synchronized(buffer))
+---------------------------------------------------------------
+Important: notifyAll() does not let those threads run immediately, because the notifier still holds the monitor.
+So the JVM does this:
+* Every thread in the Wait Set is unparked and moved to the Entry Set (conceptually)
+* Those threads now need to re-acquire the monitor to continue. Not in a FIFO manner (unfair lock)
+* While they are trying to enter synchronized(buffer), their Java thread state shows as BLOCKED (blocked on monitor entry)
+
+So:
+* WAITING = “parked, waiting to be notified on this monitor”
+* BLOCKED = “awake, but can’t proceed because someone else holds the monitor”
+
+Initial state
+===================
+1. P1, C1, C2 created but none have entered synchronized(buffer) yet.
+======================================================================
+ +--------------------------------------------------+
+ |                Monitor : buffer                  |
+ +--------------------------------------------------+
+ | Owner      : NONE                                |
+ |                                                  |
+ | Entry Set  : [                                  ]| <= not FIFO, BLOCKED
+ |                                                  |
+ | Wait Set   : [                                  ]| <= WAITING as seen in jstack
+ +--------------------------------------------------+
+
+ Threads:
+ P1 : NEW / RUNNABLE (not in synchronized)
+ C1 : NEW / RUNNABLE (not in synchronized)
+ C2 : NEW / RUNNABLE (not in synchronized)
+
+
+2. C1 enters consume() and reaches wait() (buffer empty, not closed)
+=====================================================================
+
++--------------------------------------------------+
+|                Monitor : buffer                  |
++--------------------------------------------------+
+| Owner      : NONE                                |
+|                                                  |
+| Entry Set  : [                                  ]|
+|                                                  |
+| Wait Set   : [ C1                               ]|
++--------------------------------------------------+
+
+Threads:
+P1 : RUNNABLE (outside synchronized)
+C1 : WAITING  (Object.wait on buffer)
+C2 : RUNNABLE (outside synchronized)
+
+3. C2 enters consume() and also reaches wait()
+============================================
+
+   +--------------------------------------------------+
+   |                Monitor : buffer                  |
+   +--------------------------------------------------+
+   | Owner      : NONE                                |
+   |                                                  |
+   | Entry Set  : [                                  ]|
+   |                                                  |
+   | Wait Set   : [ C1, C2                           ]|
+   +--------------------------------------------------+
+
+   Threads:
+   P1 : RUNNABLE (outside synchronized)
+   C1 : WAITING  (Object.wait on buffer)
+   C2 : WAITING  (Object.wait on buffer)
+
+!!!!!!!!!!!!!!!! IMPORTANT !!!!!!!!!!!!!!!!!!!!!!!
+4. Main thread calls close() and uses notify() (broken case).
+===================================================================
+After notify() runs, but before close() exits (main still owns the monitor).
+
++--------------------------------------------------+
+|                Monitor : buffer                  |
++--------------------------------------------------+
+| Owner      : MAIN                                |
+|                                                  |
+| Entry Set  : [                                ]| <= Note C1 was Notified and is placed under Entry Set because close()
+|                                                  |    has still not existed
+| Wait Set   : [                                ]|
++--------------------------------------------------+
+
+Threads:
+P1   : RUNNABLE (outside synchronized)
+C1   : BLOCKED  (woken, trying to re-enter monitor)
+C2   : WAITING  (still in wait set)
+MAIN : RUNNABLE (inside synchronized close)
+
+5. MAIN exits close() and releases the monitor.
+======================================================
+   C1 acquires it, re-checks conditions, sees closed && empty, returns null, exits.
+   C2 is still stuck waiting forever.
+
+   +--------------------------------------------------+
+   |                Monitor : buffer                  |
+   +--------------------------------------------------+
+   | Owner      : NONE                                |
+   |                                                  |
+   | Entry Set  : [                                  ]|
+   |                                                  |
+   | Wait Set   : [ C2                               ]|
+   +--------------------------------------------------+
+
+   Threads:
+   P1   : RUNNABLE / TERMINATED (not relevant here)
+   C1   : TERMINATED
+   C2   : WAITING  (Object.wait on buffer)
+   MAIN : WAITING  (Thread.join on C2)   // if main joined C2
+
+
+   6. MAIN calls close() and uses notifyAll()
+   =========================================================
+   After notifyAll() runs, but before close() exits (MAIN still owns the monitor).
+
+   +--------------------------------------------------+
+   |                Monitor : buffer                  |
+   +--------------------------------------------------+
+   | Owner      : MAIN                                |
+   |                                                  |
+   | Entry Set  : [ C1, C2                           ]| <= IMPORTANT: both C1 & C2 goes in entry set
+   |                                                  |
+   | Wait Set   : [                                  ]|
+   +--------------------------------------------------+
+
+   Threads:
+   P1   : RUNNABLE (outside synchronized)
+   C1   : BLOCKED  (woken, trying to re-enter monitor)
+   C2   : BLOCKED  (woken, trying to re-enter monitor)
+   MAIN : RUNNABLE (inside synchronized close)
+
+
+  7. MAIN exits close() and releases the monitor.
+  =================================================
+      C1 acquires monitor, sees closed && empty, exits.
+      Then C2 acquires monitor, sees closed && empty, exits.
+
+      +--------------------------------------------------+
+      |                Monitor : buffer                  |
+      +--------------------------------------------------+
+      | Owner      : NONE                                |
+      |                                                  |
+      | Entry Set  : [                                  ]|
+      |                                                  |
+      | Wait Set   : [                                  ]|
+      +--------------------------------------------------+
+
+      Threads:
+      P1   : RUNNABLE / TERMINATED (not relevant here)
+      C1   : TERMINATED
+      C2   : TERMINATED
+      MAIN : RUNNABLE (continues; joins return)

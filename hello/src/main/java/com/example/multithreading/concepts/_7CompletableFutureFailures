@@ -1,0 +1,143 @@
+==================================================================================
+Bug #1: “It looked successful, but half the downstream calls were failing silently”
+==================================================================================
+What happened
+You used exactly this pattern:
+    >>>>>>>>>>
+    .supplyAsync(() -> callDownstream(), es)
+    .thenAccept(...)
+    .exceptionally(ex -> { log; return null; }) <= swallows the failure.
+    CompletableFuture.allOf(futures).join(); // returns normally
+    <<<<<<<<<<<<<
+The job “completed”, dashboards showed success, but some downstream systems never got updates.
+Fix
+Don’t swallow — collect failures and fail the overall request (or route to retry/DLQ).
+Or convert to a Result<T> wrapper.
+Example pattern:
+record ApiOutcome(int id, boolean ok, Throwable error) {}
+
+CompletableFuture<ApiOutcome> f =
+  CompletableFuture.supplyAsync(() -> callApi(id), es)
+    .thenApply(resp -> new ApiOutcome(id, true, null))
+    .exceptionally(ex -> new ApiOutcome(id, false, unwrap(ex)));
+
+Then after allOf, inspect outcomes and decide:
+    fail request
+    retry failed ids
+    send to DLQ
+    partial success response
+
+==================================================================================
+Bug #2: “Thread pool got saturated; entire service became unresponsive”
+==================================================================================
+What happened
+Fanout was 6 in your toy example, but prod was 200–2000 (one request = many downstream calls).
+ Under load, latency spiked, then timeouts, then cascading failures.
+
+Why
+    -Each work(taskId) is a blocking HTTP call.
+    -With a fixed pool of 5/20/50 threads, blocking IO ties up threads.
+    -Requests pile up behind the executor queue → queueing delay explodes.
+    -Meanwhile your web server threads are waiting on allOf().join() → request threads also get stuck.
+
+Classic symptom: p99 blows up, CPU low, lots of blocked threads.
+
+Fix
+Pick one (depending on your stack):
+    -Bulkhead + bounded concurrency (limit fanout per request)
+    -Use async HTTP client (non-blocking) and avoid blocking threads
+    -In Java 21: use virtual threads for blocking IO fanout
+    -Increase pool + bounded queue + backpressure (still risky)
+
+Bound concurrency example (simple semaphore):
+
+        Semaphore permits = new Semaphore(50); // max concurrent downstream calls
+        CompletableFuture<ApiOutcome> f = CompletableFuture.supplyAsync(() -> {
+            permits.acquireUninterruptibly();
+            try { return callApi(id); }
+            finally { permits.release(); }
+        }, es);
+
+==================================================================================
+Bug #3: “Retry storm / duplicate updates (idempotency missing)”
+==================================================================================
+What happened
+
+You fanned out to 10 services. One had a transient failure. You retried the entire fanout batch (or the whole upstream request was retried by gateway). Some services got the update twice.
+
+Why
+
+Fanout + retries without idempotency = duplicates.
+Especially common if:
+
+your upstream is at-least-once (Kafka consumer, webhook, etc.)
+
+you retry on timeout (but downstream may have actually processed it)
+
+Fix
+
+Use idempotency key per downstream request (e.g., eventId + targetSystem)
+
+Downstream stores “processed keys” or uses idempotent PUT semantics
+
+Retry only failed targets, not the whole batch
+
+Bug #4: “Success callback (thenAccept) did heavy work and slowed everything”
+What happened
+
+Each thenAccept did more than logging: DB writes, JSON parsing, metrics, maybe another API call.
+
+Why
+
+thenAccept runs by default on the thread that completes the previous stage.
+So your precious IO threads (pool threads) finish HTTP call… and then spend time doing CPU/DB work, reducing throughput.
+
+Fix
+
+Offload post-processing:
+
+.thenAcceptAsync(result -> persist(result), cpuExecutor)
+
+
+Split executors:
+
+ioExecutor for blocking HTTP
+
+cpuExecutor for parsing/enrichment
+
+dbExecutor for blocking DB (or use async DB)
+
+Bug #5: “allOf().join() hung forever”
+What happened
+
+Some downstream calls never returned (socket hang, bad timeout config). Requests started piling up, and the service “froze”.
+
+Why
+
+No timeouts on the call, and no timeout on the future.
+allOf().join() waits forever if any stage never completes.
+
+Fix
+
+Always enforce timeouts at 2 layers:
+
+HTTP client timeouts (connect/read/request)
+
+Future timeout (so your code completes even if HTTP client misbehaves)
+
+Example:
+
+CompletableFuture.supplyAsync(() -> callApi(id), es)
+  .orTimeout(2, TimeUnit.SECONDS)
+  .exceptionally(ex -> fallbackOrMarkFailed(id, ex));
+
+A solid “production story” you can tell (Order-entry flavored)
+
+Situation: Order event needed fanout to 8 downstream systems (risk, compliance, allocations, confirmations, audit).
+Problem: During peak, some downstream calls timed out. The code used exceptionally(... return null) and still returned success to the caller.
+Operations thought orders were enriched, but compliance never received some updates.
+Impact: Inconsistent state across systems; manual reconciliations.
+Root cause: Exceptions swallowed + no global failure aggregation + thread pool saturation causing timeouts.
+Fix: Bounded concurrency + per-target idempotency key + collect outcomes and fail/alert on partial failure + per-call timeout + async post-processing executor.
+Result: p99 stabilized, partial failures visible, retries targeted, no duplicates.
+

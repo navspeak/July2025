@@ -1,0 +1,156 @@
+| Feature               | G1GC        | ZGC      | Shenandoah |
+| --------------------- | ----------- | -------- | ---------- |
+| Generational          | ✔ (logical) | ❌       | ❌         |
+| Regions               | ✔           | ✔        | ✔          |
+| STW pauses            | 10–200 ms   | ~1–10 ms | ~1–10 ms    |
+| Concurrent compaction | ❌           | ✔        | ✔         |
+| Large heap support    | ✔           | ✔✔       | ✔          |
+| Default in J17        | ✔           | ❌        | ❌         |
+
+======
+G1GC: “Predictable pauses using region selection”
+ZGC: “Move objects while the app is running using colored pointers”
+Shenandoah: “Move objects while the app is running using forwarding pointers”
+====
+
+Big Picture First (important)
+====================================
+ZGC and Shenandoah are region-based but NOT classic generational collectors.
+They aim for ultra-low pause times by doing almost everything concurrently.
+
+Practical takeaway for you (Java 17):
+====================================
+In Java 17, ZGC is non-generational, so you should not think in Eden/S0/S1/Old.
+In Java 21+, ZGC gets a generational mode that makes it more competitive for typical “lots of short-lived objects” services.
+1️⃣ ZGC (Java 17)
+=========================
+Heap Model
+==========
+Heap
+ ├── ZRegion
+ ├── ZRegion
+ ├── ZRegion
+ └── ...
+Fixed-size regions called ZPages
+No young / old split
+Objects can be relocated while application threads run
+
+Key innovation: Colored Pointers
+===============================
+ZGC encodes GC state inside object pointers:
+[ metadata | address ]
+Used for:
+    Marked?
+    Relocating?
+    Remapped?
+➡️ Application threads help the GC by fixing pointers on the fly.
+
+GC Phases (simplified)
+===========
+Concurrent Mark
+Concurrent Relocate
+Concurrent Remap
+Tiny STW pauses only for:
+    Root processing
+    Metadata setup
+⏱ Typical pause: sub-10ms, even with large heaps (100s of GB)
+
+When ZGC shines
+    Large heaps
+    Latency-sensitive systems
+    Spiky allocation rates
+    Cloud / container workloads
+-XX:+UseZGC
+-XX:MaxGCPauseMillis=10
+
+ZGC starts to make sense when your heap is big enough that G1’s worst-case pauses
+become noticeable and you care about tail latency.
+
+Here are useful, real-world heuristics:
+
+Practical size bands
+≤ 2–4 GB heap
+    Usually not worth ZGC
+    G1 is typically simpler and more CPU-efficient
+    Any pauses are usually already small if the heap is small
+
+~4–16 GB heap
+
+    Borderline
+    Choose ZGC if you have strict p99/p999 latency SLOs (interactive API, trading path)
+    Otherwise stick to G1 for cost/throughput
+
+~16–64 GB heap
+    This is where ZGC commonly shines
+    G1 can still be fine, but you start seeing:
+    longer / spikier pauses under pressure
+    mixed GC cycles that sometimes bite latency
+    ZGC tends to keep pauses consistently low
+
+64 GB+ heap
+    Strong ZGC territory (if latency matters)
+    This is the classic “ZGC value prop” zone: very large heaps with very small pauses
+    And yes, ZGC can work with hundreds of GB / TB-class heaps, but whether you should depends on CPU + memory headroom and workload.
+
+2️⃣ Shenandoah (Java 17)
+=========================
+Heap model
+Heap
+ ├── Region
+ ├── Region
+ ├── Region
+ └── ...
+
+Regions similar to G1
+No generational separation in Java 17
+Uses forwarding pointers, not colored pointers
+
+Key innovation: Brooks Pointer
+-------------------------------------
+Each object has an extra indirection pointer:
+object -> forwarding pointer -> actual object
+
+Allows:
+    Concurrent evacuation
+    Concurrent compaction
+    Zero long STW pauses
+Trade-off:
+    Slight memory overhead per object
+
+GC Phases
+    Concurrent Mark
+    Concurrent Evacuation
+    Concurrent Update References
+    Very short STW pauses only for coordination
+
+When Shenandoah shines
+    Latency-critical services
+    Predictable pauses
+    Medium-to-large heaps
+
+Red Hat / OpenShift environments
+
+Shenandoah flags (Java 17)
+-XX:+UseShenandoahGC
+
+Optional:
+
+-XX:MaxGCPauseMillis=10
+
+3️⃣ What Is NOT Valid in Java 17 for These Two
+
+❌ These concepts do not apply:
+
+Eden
+
+Survivor spaces
+
+Tenured / Old Gen
+
+Minor GC
+
+Major GC
+
+Promotion
+
+MaxTenuringThreshold

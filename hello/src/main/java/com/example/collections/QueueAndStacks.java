@@ -55,9 +55,11 @@ public class QueueAndStacks {
     static void queue(){
         /* When you use a Deque through the Queue interface, add / offer / remove / poll always operate on the tail for
         insert and head for removal.
+
 Queue view (FIFO):
-add / offer  ---> [ 1 ][ 2 ][ 3 ] ---> remove / poll
-                TAIL            HEAD
+                     HEAD            TAIL
+remove / poll <--- [ 1 ][ 2 ][ 3 ] <--- add / offer
+                   (Front/Left)          (Back/Right)
 
 | Call         | Equivalent Deque call | Python analogy |
 | ------------ | --------------------- | -------------- |
