@@ -1,0 +1,6 @@
+docker compose down
+docker compose up -d (-d to detached)
+docker exec -it mysql-server mysql -u root -p
+Enter password: root
+
+http://localhost:8081 root/root

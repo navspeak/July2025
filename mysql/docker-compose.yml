@@ -1,0 +1,32 @@
+services:
+  mysql:
+    build: . # 👈 tells Docker to use your Dockerfile here
+    image: mysql:8
+    container_name: mysql-server
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: mydb
+    ports:
+      - "3306:3306"
+    volumes:
+      - ./init:/docker-entrypoint-initdb.d
+      - ./data:/data
+    entrypoint: >
+      /bin/bash -c "
+      chmod +x /docker-entrypoint-initdb.d/*.sh 2>/dev/null || true &&
+      exec docker-entrypoint.sh mysqld
+      "
+
+  phpmyadmin:
+    image: phpmyadmin:latest
+    container_name: phpmyadmin
+    restart: always
+    environment:
+      PMA_HOST: mysql
+      PMA_USER: root
+      PMA_PASSWORD: root
+    ports:
+      - "8081:80"
+    depends_on:
+      - mysql
