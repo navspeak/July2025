@@ -1,0 +1,10 @@
+1. http -a user:ff0dca13-3534-4570-9242-9e6741c04ef8 GET http://localhost:8080/product
+2. http -a user:ff0dca13-3534-4570-9242-9e6741c04ef8 POST http://localhost:8080/product \
+    Accept:application/json \
+    productId:=3 \
+    productName="iPad" \
+    price:=1500
+
+    We have added spring security in pom.xml, but the above gives 401
+
+

@@ -2,6 +2,7 @@ package com.example.collections;
 
 import java.util.*;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.stream.IntStream;
 
 public class FailFastSafe {
 
