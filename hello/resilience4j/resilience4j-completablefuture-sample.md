@@ -96,11 +96,23 @@ resilience4j:
   retry:
     instances:
       pricing:
-        maxAttempts: 2
+        maxAttempts: 3
         waitDuration: 50ms
-      inventory:
-        maxAttempts: 2
-        waitDuration: 50ms
+
+        # Exponential backoff
+        enableExponentialBackoff: true
+        exponentialBackoffMultiplier: 2
+        exponentialMaxWaitDuration: 500ms
+
+        # Jitter
+        enableRandomizedWait: true
+        randomizedWaitFactor: 0.5
+
+        # Super important: DON'T retry overload signals
+        ignoreExceptions:
+          - io.github.resilience4j.bulkhead.BulkheadFullException
+          - io.github.resilience4j.circuitbreaker.CallNotPermittedException
+          - java.util.concurrent.TimeoutException
 ```
 
 ### Hikari pool (DB concurrency cap)

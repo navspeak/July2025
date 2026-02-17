@@ -94,4 +94,3 @@ state (BLOCKED / WAITING (parking))
 same lock addresses / same owner threads
 across all dumps → it’s effectively stuck (deadlock or permanent contention).
 
-If you want, paste a small snippet for one stuck thread (state + the “waiting/locked” lines + top ~10 stack frames) and I’ll tell you which of these buckets it falls into.

@@ -1,0 +1,38 @@
+1️⃣ Why Random is a problem in parallel code
+Using a single Random
+    Random r = new Random();
+    Arrays.stream(nums)
+          .parallel()
+          .forEach(i -> r.nextInt(5));
+Problem:
+- Random maintains mutable internal state (the seed)
+- Access to that state is synchronized / CAS-based
+- Multiple threads compete → contention
+- Parallelism collapses into serialization
+
+So you get:
+- worse performance
+- misleading “parallel” behavior
+
+2️⃣ What ThreadLocalRandom does differently
+ThreadLocalRandom.current().nextInt(1, 6);
+- Each thread has its own random generator
+- No shared state
+- No locks / CAS
+
+Designed specifically for multi-threaded contexts. That’s why the class name is literal: thread-local random.
+
+3️⃣ What about SplittableRandom?
+
+For completeness:
+
+SplittableRandom r = new SplittableRandom();
+- Even faster than ThreadLocalRandom
+- Designed for fork/join splitting
+- But not thread-safe itself
+- You must manually split per thread
+
+Good for advanced scenarios, overkill often.
+
+“ThreadLocalRandom avoids shared mutable state and contention, so it’s the correct choice for parallel streams.”
+

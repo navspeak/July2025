@@ -1,0 +1,34 @@
+🚀 = startup
+✅ = success
+⚠️ = warning
+❌ = error
+🔄 = retry
+⚡ = performance
+🔐 = security
+
+WIN + . => emojipicker
+
+| Emoji | Common Name (what devs say) | Official Unicode Name                                  |
+| ----- | --------------------------- | ------------------------------------------------------ |
+| 🚀    | Rocket                      | ROCKET                                                 |
+| ✅     | Check mark                  | WHITE HEAVY CHECK MARK                                 |
+| ❌     | Cross / Error               | CROSS MARK                                             |
+| ⚠️    | Warning                     | WARNING SIGN                                           |
+| 🔄    | Retry / Refresh             | ANTICLOCKWISE DOWNWARDS AND UPWARDS OPEN CIRCLE ARROWS |
+| ⚡     | Lightning / Fast            | HIGH VOLTAGE SIGN                                      |
+| 🔐    | Lock / Security             | CLOSED LOCK WITH KEY                                   |
+| 🟢    | Green circle                | LARGE GREEN CIRCLE                                     |
+| 🟡    | Yellow circle               | LARGE YELLOW CIRCLE                                    |
+| 🔴    | Red circle                  | LARGE RED CIRCLE                                       |
+| 🧠    | Brain                       | BRAIN                                                  |
+| 🐛    | Bug                         | BUG                                                    |
+| 📦    | Package / Deploy            | PACKAGE                                                |
+| 🧪    | Test                        | TEST TUBE                                              |
+| ⏳     | Waiting                     | HOURGLASS NOT DONE                                     |
+| 🕒    | Time                        | CLOCK FACE THREE OCLOCK                                |
+| 📈    | Metrics / Growth            | CHART WITH UPWARDS TREND                               |
+| 📉    | Decline                     | CHART WITH DOWNWARDS TREND                             |
+| 🧵    | Thread                      | THREAD                                                 |
+| 🧰    | Toolbox                     | TOOLBOX                                                |
+| 🧱    | Block / Wall                | BRICK                                                  |
+| 🔥    | Fire / Hot                  | FIRE                                                   |

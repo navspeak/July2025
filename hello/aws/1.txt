@@ -1,0 +1,7 @@
+- I designed an event-driven architecture where incoming data—starting from S3—triggered a flexible pipeline.
+ - A Lambda dispatcher routed jobs:
+     - smaller tasks ran directly in Lambda,
+     - medium tasks spun up Fargate,
+     - and complex workflows triggered MWAA (Airflow).
+  - From Airflow, we orchestrated PySpark jobs in Databricks.
+  - While the team handled deep Databricks work, I ensured the entire system was scalable and event-driven end to end.
