@@ -67,6 +67,13 @@ Return the smallest index i such that randomVal <= prefix[i]
     public static void main(String[] args) {
         int x = ThreadLocalRandom.current().nextInt(1, 6);
         int y = new Random().nextInt(1,6);
+        int[] a = {1, 2, 2, 5, 6};
+        int pos = Arrays.binarySearch(a, 4); // -4 -> insertion position
+        System.out.println(pos);
+        if (pos < 0){
+            pos = -pos -1;
+        }
+        System.out.println(pos);
     }
 
 
