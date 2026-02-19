@@ -1,0 +1,62 @@
+🧠 1. Basic if + remove (most explicit)
+==========
+if (window.get(key) == 0) {
+    window.remove(key);
+}
+============
+
+🚀 2. computeIfPresent (clean + atomic style)
+===
+window.computeIfPresent(key, (k, v) -> v == 1 ? null : v - 1);
+===
+👉 Returning null from the lambda = remove the key
+This is perfect for sliding window frequency maps.
+
+🧩 3. compute (works for both present + absent)
+=======
+window.compute(key, (k, v) -> {
+    if (v == null) return null;
+    int newVal = v - 1;
+    return newVal == 0 ? null : newVal;
+});
+=========
+Use this when key might or might not exist.
+
+🧹 4. remove(key, value) (conditional remove)
+========
+window.remove(key, 0);
+=========
+👉 removes only if key maps to that exact value
+Nice and concise.
+
+🧨 6. entrySet().removeIf(...) (bulk removal)
+========
+window.entrySet().removeIf(e -> e.getValue() == 0);
+=========
+👍 Pros
+
+Removes multiple entries at once
+
+Good for cleanup pass
+
+❌ 7. values().removeIf(...)
+===
+window.values().removeIf(v -> v == 0);
+====
+
+This removes entries by value, but:
+
+you don’t control which key
+
+
+🧵 8. Iterator-based removal (safe during iteration)
+===
+Iterator<Map.Entry<Integer,Integer>> it = window.entrySet().iterator();
+
+while (it.hasNext()) {
+    Map.Entry<Integer,Integer> e = it.next();
+    if (e.getValue() == 0) {
+        it.remove();  // safe removal
+    }
+}
+===
