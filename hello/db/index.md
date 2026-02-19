@@ -77,7 +77,7 @@ So 2 hops happen.
 - 📘 Clustered Index = the book itself (pages in order)
 - 📑 Non-clustered index = index at back of book
 
-# 1. What is a Bitmap Index (recap in 1 line)
+# 1. What is a Bitmap Index 
 - 👉 A bitmap index stores one bit-array per distinct value
 - 👉 Each bit position = one row in the table
 - 👉 Good for low cardinality
