@@ -1,7 +1,7 @@
 # Java Reference Types and WeakHashMap Guide
 
 ## 1. Reference Types Overview
-
+`import java.lang.ref.*;`
   ----------------------------------------------------------------------------------------------------------------------
   Reference Type            Sample Code                                                          What They Do
   ------------------------- -------------------------------------------------------------------- -----------------------
@@ -88,15 +88,13 @@ the object has been finalized and is about to be removed from memory**
 
 ## 3. HashMap vs WeakHashMap
 
-  Feature                          HashMap           WeakHashMap
-  -------------------------------- ----------------- --------------------------------
-  Key Reference Type               Strong            Weak
-  GC removes entry automatically   ❌ No             ✅ Yes
-  Predictability                   Stable            Entries may disappear after GC
-  Use case                         General purpose   Caches, listeners, metadata
-  Thread-safe                      ❌ No             ❌ No
-
-------------------------------------------------------------------------
+  |Feature |                         HashMap |          WeakHashMap |
+  |-|-|-|
+  |Key Reference Type  |             Strong  |          Weak|
+  |GC removes entry automatically|   ❌ No      |       ✅ Yes|
+  |Predictability                 |  Stable    |        Entries may disappear after GC|
+  |Use case                        | General purpose|   Caches, listeners, metadata|
+  |Thread-safe                      |❌ No     |        ❌ No|
 
 ## Key Takeaways
 
