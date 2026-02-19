@@ -2,26 +2,14 @@
 
 ## 1. Reference Types Overview
 `import java.lang.ref.*;`
-  ----------------------------------------------------------------------------------------------------------------------
-  Reference Type            Sample Code                                                          What They Do
-  ------------------------- -------------------------------------------------------------------- -----------------------
-  Strong Reference          `Person p = new Person();`                                           Object will not be
-                                                                                                 garbage collected as
-                                                                                                 long as strong
-                                                                                                 reference exists
+  
+| Reference Type   | Sample Code                                             |                                                        What They Do|
+|------------------|---------------------------------------------------------|-|
+  | Strong Reference | `Person p = new Person();`                              |                       Object will not be GC'd till strong reference exists |
+  | Soft Reference   | `SoftReference<Person> ref = new SoftReference<>(p);`   |             Collected only under memory pressure|
+   | Weak Reference   |   `WeakReference<Person> ref = new WeakReference<>(p);` |          Collected eagerly on next GC cycle|
+|  Phantom Reference  |       `PhantomReference<Person> ref = new PhantomReference<>(p, queue);`  | Used for post-cleanup tracking; object already gone |
 
-  Soft Reference            `SoftReference<Person> ref = new SoftReference<>(p);`                Collected only under
-                                                                                                 memory pressure
-
-  Weak Reference            `WeakReference<Person> ref = new WeakReference<>(p);`                Collected eagerly on
-                                                                                                 next GC cycle
-
-  Phantom Reference         `PhantomReference<Person> ref = new PhantomReference<>(p, queue);`   Used for post-cleanup
-                                                                                                 tracking; object
-                                                                                                 already gone
-  ----------------------------------------------------------------------------------------------------------------------
-
-------------------------------------------------------------------------
 
 ## 2. Code Snippets
 
