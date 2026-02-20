@@ -1,22 +1,22 @@
 package com.example.algo.linkedList;
 
  public class ListNode {
-     int val;
-     ListNode next;
+     public int val;
+     public ListNode next;
 
-     ListNode() {
+     public ListNode() {
      }
 
-     ListNode(int val) {
+     public ListNode(int val) {
          this.val = val;
      }
 
-     ListNode(int val, ListNode next) {
+     public ListNode(int val, ListNode next) {
          this.val = val;
          this.next = next;
      }
 
-     static ListNode createList(int... nums){
+     public static ListNode createList(int... nums){
          ListNode dummy = new ListNode();
          ListNode ptr = dummy;
          for (int n : nums){
@@ -28,7 +28,7 @@ package com.example.algo.linkedList;
          return ret;
      }
 
-     static void print(ListNode head){
+     public static void print(ListNode head){
          StringBuilder sb = new StringBuilder();
          while(head!=null){
              sb.append(head.val);
