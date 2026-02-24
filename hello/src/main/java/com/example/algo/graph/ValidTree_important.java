@@ -1,4 +1,4 @@
-package com.example.graph;
+package com.example.algo.graph;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -67,6 +67,7 @@ public class ValidTree_important {
     Space: O(V + E) for graph + O(V) recursion stack worst-case
      */
     private void dfs(int u, List<List<Integer>> g, boolean[] visited) {
+//        if (visited[u]) return; // NOT NEEDED as we always do dfs on unvisted here
         visited[u] = true;
         for(int v: g.get(u)){
             if (!visited[v]){

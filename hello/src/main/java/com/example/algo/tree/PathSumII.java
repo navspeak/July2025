@@ -3,7 +3,7 @@ package com.example.algo.tree;
 import java.util.ArrayList;
 import java.util.List;
 
-public class PathSumII_DFS {
+public class PathSumII {
 
        // https://leetcode.com/problems/path-sum-ii/description/
       // IMPORTANT concepts: DFS + back tracking to remember the traversal nodes

@@ -1,8 +1,6 @@
 package com.example.algo.tree;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
+import java.util.*;
 
 public class Traversal {
     public List<Integer> preOrderTraversal(TreeNode root) {
@@ -27,6 +25,75 @@ public class Traversal {
         var ret = postOrderTraversal(root.left);
         ret.addAll(postOrderTraversal(root.right));
         ret.add(root.val);
+        return ret;
+    }
+
+    // BFS
+    /*
+            1
+        /       \
+      2           3
+    /   \       /   \
+   4     5     6     7
+  / \   / \   / \   / \
+ 8  9 10 11 12 13 14 15
+ [
+  [1],
+  [3,2],
+  [4,5,6,7],
+  [15,14,13,12,11,10,9,8]
+]
+     */
+    public List<List<Integer>> zigzagLevelOrder(TreeNode root) {
+        List<List<Integer>> ret = new ArrayList<>();
+        Queue<TreeNode> q = new ArrayDeque<>();
+        q.add(root);
+        int level = 1;
+        while(!q.isEmpty()){
+            List<Integer> thisLevel = new ArrayList<>();
+            int size = q.size(); // IMPORTANT to not have it in loop below as we are adding to q and will change size
+            for (int i = 0; i < size; i++ ) {
+                var curr = q.remove();
+                thisLevel.add(curr.val);
+                if (curr.left != null) q.add(curr.left);
+                if (curr.right != null) q.add(curr.right);
+            }
+            if (level++ % 2 == 0)  Collections.reverse(thisLevel); // still O(N)
+            ret.add(thisLevel);
+
+        }
+        return ret;
+    }
+
+    public List<List<Integer>> zigzagLevelOrder_avoidReversing(TreeNode root) {
+        if (root == null) return List.of();
+
+        List<List<Integer>> ret = new ArrayList<>();
+        Queue<TreeNode> q = new ArrayDeque<>();
+        q.add(root);
+        boolean leftToRight = true;
+
+        while (!q.isEmpty()) {
+            int size = q.size();
+            Deque<Integer> levelList = new ArrayDeque<>();
+
+            for (int i = 0; i < size; i++) {
+                TreeNode curr = q.remove();
+
+                if (leftToRight) {
+                    levelList.addLast(curr.val);
+                } else {
+                    levelList.addFirst(curr.val);
+                }
+
+                if (curr.left != null) q.add(curr.left);
+                if (curr.right != null) q.add(curr.right);
+            }
+
+            ret.add(new ArrayList<>(levelList));
+            leftToRight = !leftToRight;
+        }
+
         return ret;
     }
 

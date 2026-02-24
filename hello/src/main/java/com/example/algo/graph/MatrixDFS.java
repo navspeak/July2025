@@ -1,8 +1,8 @@
-package com.example.algo.matrix;
+package com.example.algo.graph;
 
 import java.util.HashSet;
 import java.util.Set;
-
+// This is repeated in matrix folder too
 public class MatrixDFS {
 
     public static void dfs(int[][] matrix) {
