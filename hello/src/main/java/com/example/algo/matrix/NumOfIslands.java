@@ -1,4 +1,4 @@
-package com.example.algo.graph;
+package com.example.algo.matrix;
 
 public class NumOfIslands {
     static int[][] dirs = {{-1,0}, {1,0}, {0,-1}, {0, 1}};
