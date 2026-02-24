@@ -38,7 +38,7 @@ public class CloneGraph {
                     nodeMap.put(neighbor, new Node(neighbor.val));
                     q.add(neighbor);
                 }
-                cloned.neighbors.add(nodeMap.get(neighbor))
+                cloned.neighbors.add(nodeMap.get(neighbor));
             }
         }
         return nodeMap.get(node);
