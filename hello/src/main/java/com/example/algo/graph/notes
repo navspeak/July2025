@@ -1,0 +1,11 @@
+| Aspect                       | **BFS (Queue)**                          | **DFS (Recursive)**           | **DFS (Iterative – Stack)**    |
+| ---------------------------- | ---------------------------------------- | ----------------------------- | ------------------------------ |
+| **Time Complexity**          | O(V + E)                                 | O(V + E)                      | O(V + E)                       |
+| **Space (Auxiliary)**        | O(V) (queue + visited)                   | O(V) (visited + call stack)   | O(V) (stack + visited)         |
+| **Risk of Stack Overflow**   | ❌ None                                   | ⚠️ Yes (deep graph)           | ❌ None                         |
+| **Memory Usage Pattern**     | Level by level (can be wide)             | Depth-first (can be deep)     | Depth-first (controlled stack) |
+| **Best for**                 | Shortest path (unweighted), connectivity | Tree/graph recursion problems | Same as DFS but safer          |
+| **Handles Deep Chain Graph** | ✅ Safe                                   | ❌ Risky                       | ✅ Safe                         |
+| **Handles Very Wide Graph**  | ⚠️ Queue can grow large                  | ✅ Less issue                  | ✅ Less issue                   |
+| **Ease of Coding**           | Easy                                     | Easiest (clean recursion)     | Slightly more code             |
+| **Deterministic Order**      | Level-order                              | Pre/Post-order traversal      | Same as DFS                    |
