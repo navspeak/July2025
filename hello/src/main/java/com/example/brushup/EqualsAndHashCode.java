@@ -4,6 +4,7 @@ import java.util.HashMap;
 
 public class EqualsAndHashCode {
     public static void main(String[] args) {
+
         HashMap<Person, String> map = new HashMap<>();
 
         Person p1 = new Person("Alice", 30);
