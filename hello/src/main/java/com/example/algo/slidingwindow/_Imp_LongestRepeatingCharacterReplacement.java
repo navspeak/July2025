@@ -5,6 +5,42 @@ import java.util.Map;
 
 //https://leetcode.com/problems/longest-repeating-character-replacement/description/
 public class _Imp_LongestRepeatingCharacterReplacement {
+
+    public static int characterReplacement_Latest(String s, int k){
+        Map<Character, Integer> window = new HashMap<>();
+        int left = 0, right = 0;
+        int max = 0;
+        while(right < s.length()){
+            int maxVal = window.merge(s.charAt(right), 1, Integer::sum);
+            right++;
+            //while(!windowValid(window, left, right, k)){ //Optimize => while to if
+            if(right - left - maxVal > k){
+                window.compute(s.charAt(left), (key,v) -> {
+                    if (v == 1) return null;
+                    return v-1;
+                });
+                left++;
+            }
+            max = Math.max(max, right-left);
+        }
+        return max;
+
+    }
+
+    private static boolean windowValid(Map<Character, Integer> window, int left, int right, int k) {
+        var totalWindowSize = right - left;
+        int maxVal = 0;
+        // optimization: we can use maxVal calculated before shriniking as:
+        // totalWindowSize - maxVal <= k; say maxVal = 5 but before shrinking was 7. totalWindowSize = 10, k = 5
+        // if 10 - 5 <= 5 is true then 10 - 7 is also <=5
+        // now say maxVal = 4 but before shrinking was 5. totalWindowSize = 10, k = 5
+        // similarly, if 10 - 4 > 5 then 10 -5 is equal to 5. Meaning we can shrink 1, so not use while but if
+        for (var value: window.values()){
+            maxVal = Math.max(maxVal, value);
+        }
+
+        return totalWindowSize - maxVal <= k;
+    }
     // ABBAACAAAAA 1
     // maxKey = 0, maxOccurence = 1, max = 2
     // L :0, R:0 -> {A:1}
@@ -26,7 +62,6 @@ public class _Imp_LongestRepeatingCharacterReplacement {
         }
         return max;
     }
-
 
 
     public static int characterReplacement(String s, int k) {

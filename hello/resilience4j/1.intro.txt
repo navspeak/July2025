@@ -40,10 +40,3 @@ Lightweight (no thread pools forced)
 Pure Java (functional style)
 Spring-friendly annotations
 Actuator + Micrometer support
-
-
-
-
-
-No file chosenNo file chosen
-ChatGPT can make mistakes. Check important info. See Cookie Preferences.

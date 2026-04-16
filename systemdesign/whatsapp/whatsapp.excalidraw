@@ -1,0 +1,48 @@
+{
+  "type": "excalidraw",
+  "version": 2,
+  "source": "https://excalidraw-jetbrains-plugin",
+  "elements": [
+    {
+      "id": "SWrvfdyCxQccfE5V3DWl5",
+      "type": "text",
+      "x": 338,
+      "y": 8,
+      "width": 1015.6991577148438,
+      "height": 525,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 1834920644,
+      "version": 1277,
+      "versionNonce": 240392956,
+      "isDeleted": false,
+      "boundElements": null,
+      "updated": 1775835117871,
+      "link": null,
+      "locked": false,
+      "text": "Functional Requirement\n\n1. start chat (1:1 vs Group chat participant)\n2. send/receive message (chat)\n3. send/receive media\n4. delete messages\n5. Message state - sent/read\n5. Presence (Online/Offline): This is a heavy-duty requirement.\n Tracking millions of persistent socket connections to show a \"green dot\" or \"Last Seen\" \nis a massive scaling challenge.\n---\nNFR:\n1. Availability: whatsapp must be up always (5 nine) \n            : robust infra, redundancy, failover and quick recovery (monitoring)\n2. Latency: No perceivable delay (esp when no network partition has happened. \n      - In case of n/w failure, eventual consistency =>\n3. Security = cross cutting concerns. E2E\n4. Scalability = related to availability as well. In order to be highly available, or to serve con\ncurrent request - servers, database must scale (auto scaling based on metrics, load).\n5 Durability - sent message must be received. storage on server only till not delivered (max 30 days)\n6. Maintainability = for data back up etc must not cause downtime  ",
+      "fontSize": 20,
+      "fontFamily": 1,
+      "textAlign": "left",
+      "verticalAlign": "top",
+      "baseline": 518,
+      "containerId": null,
+      "originalText": "Functional Requirement\n\n1. start chat (1:1 vs Group chat participant)\n2. send/receive message (chat)\n3. send/receive media\n4. delete messages\n5. Message state - sent/read\n5. Presence (Online/Offline): This is a heavy-duty requirement.\n Tracking millions of persistent socket connections to show a \"green dot\" or \"Last Seen\" \nis a massive scaling challenge.\n---\nNFR:\n1. Availability: whatsapp must be up always (5 nine) \n            : robust infra, redundancy, failover and quick recovery (monitoring)\n2. Latency: No perceivable delay (esp when no network partition has happened. \n      - In case of n/w failure, eventual consistency =>\n3. Security = cross cutting concerns. E2E\n4. Scalability = related to availability as well. In order to be highly available, or to serve con\ncurrent request - servers, database must scale (auto scaling based on metrics, load).\n5 Durability - sent message must be received. storage on server only till not delivered (max 30 days)\n6. Maintainability = for data back up etc must not cause downtime  ",
+      "lineHeight": 1.25
+    }
+  ],
+  "appState": {
+    "gridSize": null,
+    "viewBackgroundColor": "#ffffff"
+  },
+  "files": {}
+}

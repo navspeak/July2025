@@ -1,0 +1,76 @@
+1️⃣ Fixed Window:
+===================
+windowStart = floor(t / W) * W
+
+if (windowStart != prevWindow):
+    count = 0
+
+allow if count < limit
+
+2️⃣ Sliding Window Log
+====================
+S = { ti | ti ∈ timestamps and ti > t - W }
+
+allow if |S| < limit
+
+on allow:
+    timestamps.add(t)
+3️⃣ Token Bucket (AWS style)
+====================
+Δt = t - lastRefillTime
+
+tokens = min(C, tokens + r * Δt)
+
+allow if tokens ≥ 1
+
+if allowed:
+    tokens = tokens - 1
+
+lastRefillTime = t
+4️⃣ Leaky Bucket (for later file)
+====================
+queue = max(0, queue - drainRate * Δt)
+
+allow if queue < capacity
+
+if allowed:
+    queue = queue + 1
+5️⃣ Sliding Window Counter (approximation)
+====================
+let currentWindowStart = floor(t / W) * W
+let previousWindowStart = currentWindowStart - W
+
+weight = (t - currentWindowStart) / W
+
+effectiveCount =
+    count_current +
+    count_previous * (1 - weight)
+
+allow if effectiveCount < limit
+
+🎯 Intuition comparison (1-liners)
+====================
+Strategy	       Intuition
+Fixed Window	   “How many in this second?”
+Sliding Log	       “How many in last 1 second from now?”
+Token Bucket	   “Do I have tokens to spend?”
+Leaky Bucket	   “Is my queue full?”
+Sliding Counter	   “Weighted blend of last + current window”
+🚀 Interview ready one-liner
+
+Fixed window is simple but bursty, sliding log is accurate but heavy, token bucket allows controlled bursts with O(1) memory,
+and sliding window counter gives a good approximation with low cost.
+
+| Strategy                            | Core Idea                                       | State Variables                           | Decision Rule (Math)                                   | Update Rule                                               | Memory   |                                     |      |
+| ----------------------------------- | ----------------------------------------------- | ----------------------------------------- | ------------------------------------------------------ | --------------------------------------------------------- | -------- | ----------------------------------- | ---- |
+| **Fixed Window Counter**            | Count requests in fixed time buckets            | `count`, `windowStart`                    | Allow if `count < limit`                               | If `floor(t/W) != currentWindow` → reset `count = 0`      | O(1)     |                                     |      |
+| **Sliding Window Log**              | Count requests in last W ms (exact)             | `timestamps[]`                            | Allow if `                                             | timestamps ∈ (t-W, t]                                     | < limit` | Remove all `ti ≤ t-W`, then add `t` | O(N) |
+| **Token Bucket**                    | Tokens refill over time, request consumes token | `tokens`, `lastRefillTime`                | Allow if `tokens ≥ 1`                                  | `tokens = min(C, tokens + (t-last)*r)` then `tokens -= 1` | O(1)     |                                     |      |
+| ** Leaky Bucket**                   | Queue + constant drain rate                     | `queueSize`                               | Allow if `queueSize < capacity`                        | `queueSize = max(0, queueSize - drainRate * Δt) + 1`      | O(1)     |                                     |      |
+| **Sliding Window Counter** (approx) | Weighted avg of prev + current window           | `count_curr`, `count_prev`, `windowStart` | `effective = count_curr + weight * count_prev < limit` | shift window, update counts                               | O(1)     |                                     |      |
+
+HTTP/1.1 429 Too Many Requests
+Retry-After: 2
+Content-Type: application/json
+
+{"error":"rate_limited","retryAfterSeconds":2}

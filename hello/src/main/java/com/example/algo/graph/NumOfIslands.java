@@ -1,4 +1,4 @@
-package com.example.algo.matrix;
+package com.example.algo.graph;
 //https://leetcode.com/problems/number-of-islands/
 public class NumOfIslands {
     static int[][] dirs = {{-1,0}, {1,0}, {0,-1}, {0, 1}};

@@ -5,21 +5,25 @@ import java.util.*;
 public class Algo {
 
     String longestPalindromicSubstring(String s){
-        if (s == null) return "";
-        int start =0;
-        int end =0;
-        int len = 1;
+        if (s == null || s.length() == 0) return s;
+        int start = 0, end = 0;
+        int max = 1;
         for (int i = 0; i < s.length(); i++) {
-            int len1 = expand(s, i, i);
-            int len2 = expand(s, i, i+1);
-            int newlen = Math.max(len1, len2);
-            if (newlen > len){
-                start = i - (newlen -1)/2;
-                end = i + (newlen)/2;
-                len = newlen;
+            int l1 = expand(s, i, i);
+            int l2 = expand(s, i, i+1);
+            if (l1 > l2 && l1 > max){
+                start = i - (l1-1)/2;
+                end = i + (l1-1)/2;
+                max = l1;
+
+            } else if (l2>max){
+                start = i - (l2-2)/2;
+                end = i + 1 + (l2-2)/2;
+                max=l2;
             }
+
         }
-        return s.substring(start, end);
+        return s.substring(start, end+1);
     }
 
     public int expand(String s, int left, int right) {

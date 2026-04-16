@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<body>
+<h2>SSE Test</h2>
+
+<script>
+    const username = "john";
+    const password = "password";
+    const authHeader = "Basic " + btoa(`${username}:${password}`);
+
+    async function subscribeSSE(url) {
+      const resp = await fetch(url, {
+        headers: {
+          "Authorization": authHeader,
+          "Accept": "text/event-stream"
+        }
+      });
+
+      const reader = resp.body.getReader();
+      const decoder = new TextDecoder();
+
+      while (true) {
+        const {value, done} = await reader.read();
+        if (done) break;
+        console.log(decoder.decode(value));
+      }
+    }
+
+    subscribeSSE("http://localhost:8080/api/stream");
+</script>
+
+</body>
+</html>

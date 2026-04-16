@@ -1,0 +1,58 @@
+1. The "Zombieland" (Rebalance Loop)
+=======================
+If a consumer takes too long to process a single batch of messages, Kafka thinks it has died and kicks it out of the group.
+The Cause: Your code is processing a message, but it exceeds max.poll.interval.ms.
+The Symptom: You’ll see "Attempt to heart beat failed" or "Rebalance" in the logs.
+            The consumer spends all its time "joining the group" and never actually gets to "work."
+
+===
+spring.kafka.consumer.properties.max.poll.interval.ms= 300000 # 5 minutes (default)
+        2. The Rebalance Logic (P1=>C1, P2 =>C2, P3=>C3 (slow))
+            --> The Processing Lag: Consumer 3 (C3) fetches a batch of messages. One message is "heavy" (e.g., a long-running DB transaction or a slow API call). The Deadline: The clock for max.poll.interval.ms starts the moment .poll() returns data. If C3 doesn't call .poll() again before the timer hits zero, it is considered a "Lame Duck."
+           --> The Eviction: The Broker (Group Coordinator) sees the timeout and says: "C3 is alive (heartbeating) but not working. I'm taking its partitions away."
+           --> The Rebalance: P3 is reassigned to C1.
+           --> The "Work Theft": C1 now tries to process that same heavy message that C3 was working on.
+        3. The "Joining" Loop (The "Zombieland" part)
+           --> When C3 finally finishes its slow task, it attempts to commit its offset and call .poll() again.
+                The Error: Kafka tells C3: "You aren't part of this group anymore."
+           --> The Join Request: C3 immediately sends a JoinGroup request to get back in.
+           --> The Global Stop: Every time C3 tries to join, Kafka triggers another rebalance for the whole group (C1, C2, and C3).
+
+            The Result: During a rebalance, "STW" (Stop-the-World) happens. Processing pauses for everyone. C3 might get P3 back, start the heavy task again, timeout again, and the whole cycle repeats.
+            This is why it looks like it's not "working"—it is spending more time negotiating who owns which partition than it is actually moving data.
+            How to break the loop?
+            =====================
+            If you are seeing this in your logs, you have three main levers:
+            Strategy             Action                                     Trade-off
+            Increase Timeout    Bump max.poll.interval.ms to be
+                                longer than your slowest possible task.     If a consumer actually crashes,
+                                                                            it takes longer for the group to realize it.
+            Reduce Batch Size   Lower max.poll.records.
+                                (Instead of 500 records,
+                                process 50 at a time).                       Slightly more network overhead because you are polling more often
+
+            Parallelize         Hand the work off to a separate thread pool
+                                 and let the consumer thread just keep polling. Very dangerous—you lose Kafka's built-in ordering and offset management                                                 guarantees.
+
+
+
+2. The "Poison Pill" (Serialization Errors)
+=======================================
+This is a classic Java/Spring Boot headache.
+The Cause: The producer sent a message that the consumer cannot deserialize (e.g., a missing field, wrong JSON format, or a class mismatch).
+The Symptom: The consumer tries to read the record, throws a SerializationException, and—depending on your error
+ handler—might just stop or keep retrying the same broken record forever.
+
+The Fix: Check if you have an ErrorHandlingDeserializer configured in your Spring properties.
+
+3. The "Stuck in Traffic" (Max In-Flight / Batching)
+=================================================
+Sometimes the consumer is actually working, but it’s "stuck" on a very heavy batch.
+The Cause: If fetch.min.bytes is set high, the consumer will wait until the broker has enough data to send a full batch.
+If your traffic is low, it might look "stuck" when it's really just "waiting.
+"The Symptom: High latency between message production and consumption.
+
+4. Authorization & Security (The Silent Wall)
+========================================
+Given your focus on OAuth2 and PKCE, this is a common culprit in enterprise environments.
+The Cause: The consumer's token has expired, or the ACLs (Access Control Lists) on the broker were changed.The Symptom: The consumer connects, but it isn't authorized to read from that specific topic. Often, it won't throw a hard crash; it will just receive "empty" responses from the broker.Troubleshooting ChecklistStepActionWhat to look for1. CLI CheckRun kafka-consumer-groups --describeIs the CURRENT-OFFSET moving? Is there a LOG-END-OFFSET?2. Log DiveFilter for org.apache.kafkaLook for "Group rebalance," "Commit failed," or "Offset out of range."3. NetworkingCheck bootstrap.serversCan you telnet to the broker port from the consumer pod?4. HeartbeatCheck session.timeout.msIs the consumer losing its heartbeat because the CPU is pegged?One subtle thing to check...If you are using Spring Kafka, check your AckMode. If you have it set to MANUAL and your code hits an exception before you call ack.acknowledge(), that message will never be committed, and the consumer will keep pulling the same record over and over upon restart.Since you're starting a new role this week (congrats on the Monday start!), are you checking this for a hand-over project or a fresh setup?

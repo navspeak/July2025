@@ -1,0 +1,69 @@
+package domain:
+
+public record FileEncryptionContext (
+   Cipher cipher iv, base[] iv, String dekBase64){
+}
+
+public record FileEncryptionMetadata (
+   String originalFileName, String ivBase64, String wrappedDek
+   )
+}
+
+public record StagingPath(
+      Path inputPath, Path outputPath, String traceId, String spanId){}
+===
+package processor:
+@Component class EncryptionProcessor {
+     String AES_GCM = "AES/GCM/NoPadding";
+     GCM_IV_BYTES = 12;
+     GCM_TAG_BYTES = 128;
+     AES_KEY_BYTES = 128;
+
+    String generateDekBase64(){
+            var kg =KeyGenerator.getInstance("AES");
+            kg.init(AES_KEY_BITS);
+            SecretKey secretkey = kg.generateKey()
+            return Base64.getEncoder().encodeToString(secrtKey.getEncoded());
+    }
+    public FileEncryptionContext initEncrypt(){
+        String dekBase64 = generateDekBase64();
+        byte[] dekBytes = Base64.getDecoder().decode(dekBase64);
+
+        byte[] iv = new byte[GCM_IV_BYTES]
+        random.nextBytes(iv);
+
+        Cipher cipher = Cipher.getInstance(AES_GCM)
+        Cipher.init( Cipher.ENCRYPT_MODE, new SecretKeySpec(dekBytes, "AES"),
+                new GCMParameterSpec(GCM_TAG_BITS, iv));
+        return new FileEncryptionContext(cipher, iv, dekBase64)
+    }
+
+    public Cipher initDecryptCipher(
+              FileEncryptionContext metadata, String dekBase64
+              ) {
+           var iv = Base64.getDecoder().decode(metadata.ivBase64());
+           var dekBytes = Base64.getDecoder().decode(dekBase64);
+           Cipher cipher = Cipher.getInstance(AES_GCM);
+           cipher.init(Cipher.DECRYPT_MODE, new SecretKeySpec(dekBytes. "AES"),
+                  new GCMParameterSpec(GCM_TAG_BITS, iv));
+           return cipher;
+      }
+}
+
+@component class FileProcessor{
+
+          public StagingPath getPaths (MultipartFile file, Operation op) { // Operation enum encrypt decrypt }
+
+          }
+
+   package service'
+
+   Service FileEncryptionService:
+   autowired encryptionProcessor
+
+   public StaginPath encryptFile (StaginPath paths)
+   {
+           encryptionCotnext = encryptionProcessor.initEncrypt()
+           get dek from here call vault
+           take this and encrppt file data using CipherOutputStream
+   }

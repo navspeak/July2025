@@ -1,0 +1,114 @@
+🧾 Problem: Capital Gains Tax Calculator
+- You are building a system to calculate taxes on stock market transactions.
+- Given a sequence of trades, your program must compute the tax due for each trade,
+based on realized profit or loss.
+
+Trades must be processed in the order they are received.
+
+📥 Input
+- A list of trades. Each trade contains:
+- tradeId: unique identifier
+- date: trade date (ISO format)
+- symbol: asset symbol (e.g., AAPL, GOOG)
+- type: BUY or SELL
+- quantity: number of shares (integer > 0)
+- unitPrice: price per share (decimal)
+Example Input
+[
+{ "tradeId": "t1", "date": "2026-03-01", "symbol": "AAPL", "type": "BUY",  "quantity": 100, "unitPrice": 10.00 },
+{ "tradeId": "t2", "date": "2026-03-02", "symbol": "AAPL", "type": "BUY",  "quantity": 50,  "unitPrice": 14.00 },
+{ "tradeId": "t3", "date": "2026-03-03", "symbol": "AAPL", "type": "SELL", "quantity": 80,  "unitPrice": 20.00 }
+]
+📤 Output
+For each trade, return:
+tradeId
+taxDue
+
+Rules:
+1. For BUY → tax is always 0
+2. For SELL → calculate tax based on rules below
+Example Output
+[
+{ "tradeId": "t1", "taxDue": 0.00 },
+{ "tradeId": "t2", "taxDue": 0.00 },
+{ "tradeId": "t3", "taxDue": 138.67 }
+]
+⚙️ Tax Rules
+1. Cost Basis (Weighted Average)
+For each asset (symbol), maintain:
+ - total quantity held
+  - average cost per unit
+
+When buying:
+
+newAvgCost =
+((currentQty × currentAvgCost) + (buyQty × buyPrice))
+/ newTotalQty
+2. Sell Operation
+
+When selling:
+
+proceeds = sellQty × sellPrice
+costBasis = sellQty × avgCost
+pnl = proceeds − costBasis
+
+3. Tax Calculation
+   If pnl ≤ 0 → no tax
+   If pnl > 0:
+   offset using previously accumulated losses
+   remaining = taxable gain
+   tax = 20% of taxable gain
+4. Loss Carry Forward
+   Losses are accumulated per asset
+   Losses can offset future gains of the same asset only
+5. Multi-Asset Handling
+   Trades for different symbols must be processed independently
+   Each symbol maintains its own:
+   quantity
+   average cost
+   accumulated loss
+   📌 Constraints
+   Trades are processed in order (no sorting required)
+   You cannot sell more than you hold
+   Use precise decimal arithmetic (no floating point)
+   Assume a flat tax rate of 20%
+   Ignore fees, dividends, and currency conversion
+   🧪 Expectations
+
+Your solution should:
+
+Be easy to run (CLI or simple API)
+Be well-structured and readable
+Include unit tests
+Include a README explaining:
+assumptions
+design decisions
+how to run
+⭐ Bonus (Optional)
+Support multiple assets in one run
+Add validation for invalid trades
+Design for extensibility (e.g., different tax rules)
+🎯 Evaluation Criteria
+
+You will be evaluated on:
+
+correctness
+code quality
+clarity of design
+handling of edge cases
+test coverage
+explanation of decisions
+🚀 Your task
+
+Build a solution that:
+
+List<Trade> → List<TaxResult>
+👍 When you're done
+
+Send me your:
+
+design
+code
+or just approach
+
+I’ll review it like a Nubank interviewer (strict but fair) 🔥
