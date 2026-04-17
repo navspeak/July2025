@@ -6,6 +6,7 @@ import java.time.Duration;
 @ConfigurationProperties(prefix = "app.vault")
 public record VaultProperties(
         String url,
+        String namespace,
         String roleId,
         String secretId,
         String mountPath,

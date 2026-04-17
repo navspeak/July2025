@@ -1,9 +1,10 @@
-server:
+.server:
   port: 8081
 
 app:
   vault:
     url: ${VAULT_URL:http://localhost:8200}
+    namespace: ${VAULT_NAMESPACE:harness/myproj}
     role-id: ${VAULT_ROLE_ID:your-role-id}
     secret-id: ${VAULT_SECRET_ID:your-secret-id}
     mount-path: transit

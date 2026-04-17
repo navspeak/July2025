@@ -48,28 +48,13 @@ public class VaultConfig extends AbstractVaultConfiguration {
 
     @Override
     public ClientAuthentication clientAuthentication() {
-        JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory();
-        requestFactory.setReadTimeout(vaultProperties.readTimeout());
-
-        RestTemplate restTemplate = VaultClients.createRestTemplate(vaultEndpoint(), requestFactory);
-
-        AppRoleAuthenticationOptions options = AppRoleAuthenticationOptions.builder()
-                .roleId(AppRoleAuthenticationOptions.RoleId.provided(vaultProperties.roleId()))
-                .secretId(AppRoleAuthenticationOptions.SecretId.provided(vaultProperties.secretId()))
-                .build();
-
-        return new AppRoleAuthentication(options, restTemplate);
+        return new AppRoleAuthentication(buildOptions(), buildRestTemplate());
     }
 
     @Bean
     @Override
     public SessionManager sessionManager() {
-        JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory();
-        requestFactory.setReadTimeout(vaultProperties.readTimeout());
-
-        RestTemplate restTemplate = VaultClients.createRestTemplate(vaultEndpoint(), requestFactory);
-
-        return new LifecycleAwareSessionManager(clientAuthentication(), taskScheduler, restTemplate);
+        return new LifecycleAwareSessionManager(clientAuthentication(), taskScheduler, buildRestTemplate());
     }
 
     @Bean
@@ -79,5 +64,41 @@ public class VaultConfig extends AbstractVaultConfiguration {
         scheduler.setThreadNamePrefix("vault-session-");
         scheduler.initialize();
         return scheduler;
+    }
+
+    private AppRoleAuthenticationOptions buildOptions() {
+        return AppRoleAuthenticationOptions.builder()
+                .roleId(AppRoleAuthenticationOptions.RoleId.provided(vaultProperties.roleId()))
+                .secretId(AppRoleAuthenticationOptions.SecretId.provided(vaultProperties.secretId()))
+                .build();
+    }
+
+    private RestTemplate buildRestTemplate() {
+        JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory();
+        requestFactory.setReadTimeout(vaultProperties.readTimeout());
+
+        RestTemplate restTemplate = VaultClients.createRestTemplate(vaultEndpoint(), requestFactory);
+
+        // Vault namespace is sent as X-Vault-Namespace header on every request.
+        // Mount paths (transit, secret) are relative within the namespace.
+        //
+        // Effective URL resolution:
+        //   app.vault.url        = https://vault.host:8200
+        //   app.vault.namespace  = harness/myproj
+        //   app.vault.mount-path = transit
+        //
+        //   Spring Vault sends:
+        //     POST https://vault.host:8200/v1/transit/encrypt/mykey
+        //     X-Vault-Namespace: harness/myproj
+        //
+        //   Vault resolves internally to: /v1/harness/myproj/transit/encrypt/mykey
+        if (vaultProperties.namespace() != null) {
+            restTemplate.getInterceptors().add((request, body, execution) -> {
+                request.getHeaders().set("X-Vault-Namespace", vaultProperties.namespace());
+                return execution.execute(request, body);
+            });
+        }
+
+        return restTemplate;
     }
 }

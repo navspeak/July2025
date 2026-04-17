@@ -34,6 +34,34 @@ vault write -f auth/approle/role/encryption-service/secret-id
 
 ---
 
+## Vault URL Resolution
+
+Spring Vault does **not** embed the namespace in the URL path. Instead it sends
+`X-Vault-Namespace` as a request header and all mount paths are relative within that namespace.
+
+| Config | Value | Role |
+|--------|-------|------|
+| `app.vault.url` | `https://vault.host:8200` | Base host and port |
+| `app.vault.namespace` | `harness/myproj` | Sent as `X-Vault-Namespace` header |
+| `app.vault.mount-path` | `transit` | Mount path relative to namespace |
+| `app.vault.key-name` | `mykey` | Transit key name |
+
+**What Spring Vault sends:**
+```
+POST https://vault.host:8200/v1/transit/encrypt/mykey
+X-Vault-Namespace: harness/myproj
+```
+
+**What Vault resolves internally:**
+```
+/v1/harness/myproj/transit/encrypt/mykey
+```
+
+The same applies to KV — `opsForVersionedKeyValue("secret")` resolves to
+`harness/myproj/secret/data/{path}` automatically via the namespace header.
+
+---
+
 ## Configuration
 
 Set the following environment variables before running:
