@@ -18,30 +18,30 @@ public class VaultTransitService {
     }
 
     public String wrapDek(String dekBase64, String keyName) {
-        return vaultTemplate.opsForTransit(vaultProperties.mountPath())
+        return vaultTemplate.opsForTransit(vaultProperties.transitMountPath())
                 .encrypt(resolveKey(keyName), Plaintext.of(dekBase64))
                 .getCiphertext();
     }
 
     public String unwrapDek(String wrappedDek, String keyName) {
-        return vaultTemplate.opsForTransit(vaultProperties.mountPath())
+        return vaultTemplate.opsForTransit(vaultProperties.transitMountPath())
                 .decrypt(resolveKey(keyName), Ciphertext.of(wrappedDek))
                 .asString();
     }
 
     public String encryptText(String plaintext, String keyName) {
-        return vaultTemplate.opsForTransit(vaultProperties.mountPath())
+        return vaultTemplate.opsForTransit(vaultProperties.transitMountPath())
                 .encrypt(resolveKey(keyName), Plaintext.of(plaintext))
                 .getCiphertext();
     }
 
     public String decryptText(String ciphertext, String keyName) {
-        return vaultTemplate.opsForTransit(vaultProperties.mountPath())
+        return vaultTemplate.opsForTransit(vaultProperties.transitMountPath())
                 .decrypt(resolveKey(keyName), Ciphertext.of(ciphertext))
                 .asString();
     }
 
-    private String resolveKey(String keyName) {
-        return keyName != null ? keyName : vaultProperties.keyName();
+    private String resolveKey(String transitKey) {
+        return transitKey != null ? transitKey : vaultProperties.transitKey();
     }
 }

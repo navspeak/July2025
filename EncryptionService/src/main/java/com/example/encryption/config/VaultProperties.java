@@ -9,8 +9,9 @@ public record VaultProperties(
         String namespace,
         String roleId,
         String secretId,
-        String mountPath,
-        String keyName,
+        String transitMountPath,
+        String kvMountPath,
+        String transitKey,
         Duration readTimeout) {
 
     public VaultProperties {

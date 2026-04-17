@@ -7,8 +7,9 @@ app:
     namespace: ${VAULT_NAMESPACE:harness/myproj}
     role-id: ${VAULT_ROLE_ID:your-role-id}
     secret-id: ${VAULT_SECRET_ID:your-secret-id}
-    mount-path: transit
-    key-name: my-key
+    transit-mount-path: transit
+    kv-mount-path: secret
+    transit-key: my-key
     read-timeout: 5s
 
 spring:
