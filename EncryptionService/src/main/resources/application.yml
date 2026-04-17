@@ -36,6 +36,5 @@ management:
 springdoc:
   swagger-ui:
     path: /swagger-ui.html
-    url: /openapi.yml
   api-docs:
-    enabled: false
+    enabled: true

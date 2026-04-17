@@ -1,7 +1,10 @@
 package com.example.encryption.config;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.client.ClientHttpRequestFactory;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.scheduling.TaskScheduler;
 import org.springframework.vault.authentication.AppRoleAuthentication;
@@ -18,7 +21,7 @@ import java.net.URI;
 
 /**
  * Token acquisition flow:
- *   1. On first Vault operation, AppRoleAuthentication calls POST /v1/auth/approle/login
+ *   1. On first Vault operation, AppRoleAuthentication calls POST /v1/auth/<authMountPath>/login
  *      with role_id and secret_id to obtain a client_token.
  *   2. LifecycleAwareSessionManager caches the token and monitors its TTL.
  *   3. Before the token expires, the session manager proactively renews it via
@@ -31,6 +34,8 @@ import java.net.URI;
  */
 @Configuration
 public class VaultConfig extends AbstractVaultConfiguration {
+
+    private static final Logger log = LoggerFactory.getLogger(VaultConfig.class);
 
     private final VaultProperties vaultProperties;
     private final TaskScheduler taskScheduler;
@@ -60,36 +65,41 @@ public class VaultConfig extends AbstractVaultConfiguration {
         return AppRoleAuthenticationOptions.builder()
                 .roleId(AppRoleAuthenticationOptions.RoleId.provided(vaultProperties.roleId()))
                 .secretId(AppRoleAuthenticationOptions.SecretId.provided(vaultProperties.secretId()))
-                .appRolePath(vaultProperties.authMountPath())
+                // Full mount path in URL: POST /v1/auth/<authMountPath>/login — no namespace header needed.
+                .path(vaultProperties.authMountPath())
                 .build();
     }
 
+    // Auth RestTemplate — no namespace header; authMountPath is the absolute URL path.
     private RestTemplate buildRestTemplate() {
         JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory();
         requestFactory.setReadTimeout(vaultProperties.readTimeout());
+        return VaultClients.createRestTemplate(vaultEndpoint(), requestFactory);
+    }
 
-        RestTemplate restTemplate = VaultClients.createRestTemplate(vaultEndpoint(), requestFactory);
-
-        // Vault namespace is sent as X-Vault-Namespace header on every request.
-        // Mount paths (transit, secret) are relative within the namespace.
-        //
-        // Effective URL resolution:
-        //   app.vault.url        = https://vault.host:8200
-        //   app.vault.namespace  = harness/myproj
-        //   app.vault.mount-path = transit
-        //
-        //   Spring Vault sends:
-        //     POST https://vault.host:8200/v1/transit/encrypt/mykey
-        //     X-Vault-Namespace: harness/myproj
-        //
-        //   Vault resolves internally to: /v1/harness/myproj/transit/encrypt/mykey
+    // Called by AbstractVaultConfiguration when building VaultTemplate for transit/KV operations.
+    //
+    // Vault namespace is sent as X-Vault-Namespace header — mount paths are relative within it.
+    //
+    //   app.vault.url        = https://vault.host:8200
+    //   app.vault.namespace  = harness/myproj
+    //   app.vault.mount-path = transit
+    //
+    //   Spring Vault sends:
+    //     POST https://vault.host:8200/v1/transit/encrypt/mykey
+    //     X-Vault-Namespace: harness/myproj
+    //
+    //   Vault resolves internally to: /v1/harness/myproj/transit/encrypt/mykey
+    @Override
+    protected RestTemplate createRestTemplate(VaultEndpoint endpoint, ClientHttpRequestFactory requestFactory) {
+        RestTemplate restTemplate = super.createRestTemplate(endpoint, requestFactory);
         if (vaultProperties.namespace() != null) {
             restTemplate.getInterceptors().add((request, body, execution) -> {
+                log.debug("Vault ops: {} {}", request.getMethod(), request.getURI());
                 request.getHeaders().set("X-Vault-Namespace", vaultProperties.namespace());
                 return execution.execute(request, body);
             });
         }
-
         return restTemplate;
     }
 }

@@ -1,11 +1,15 @@
 package com.example.encryption.controller;
 
 import com.example.encryption.vault.VaultKVService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
 
+@Tag(name = ApiDocs.TAG_SECRETS)
 @RestController
 @RequestMapping("/api/v1/secrets")
 public class VaultKVController {
@@ -16,6 +20,9 @@ public class VaultKVController {
         this.vaultKVService = vaultKVService;
     }
 
+    @Operation(summary = ApiDocs.SECRET_WRITE_SUMMARY)
+    @ApiResponse(responseCode = "204", description = ApiDocs.RESP_204)
+    @ApiResponse(responseCode = "500", description = ApiDocs.RESP_500)
     @PostMapping("/{path}")
     public ResponseEntity<Void> write(
             @PathVariable String path,
@@ -25,12 +32,18 @@ public class VaultKVController {
         return ResponseEntity.noContent().build();
     }
 
+    @Operation(summary = ApiDocs.SECRET_READ_SUMMARY)
+    @ApiResponse(responseCode = "200", description = "Key-value map at path")
+    @ApiResponse(responseCode = "404", description = ApiDocs.RESP_404)
     @GetMapping("/{path}")
     public ResponseEntity<Map<String, Object>> read(@PathVariable String path) {
         Map<String, Object> data = vaultKVService.readSecret(path);
         return data.isEmpty() ? ResponseEntity.notFound().build() : ResponseEntity.ok(data);
     }
 
+    @Operation(summary = ApiDocs.SECRET_READ_KEY_SUMMARY)
+    @ApiResponse(responseCode = "200", description = "Single key-value entry")
+    @ApiResponse(responseCode = "404", description = ApiDocs.RESP_404)
     @GetMapping("/{path}/{key}")
     public ResponseEntity<Map<String, String>> readKey(
             @PathVariable String path,
@@ -42,6 +55,9 @@ public class VaultKVController {
                 : ResponseEntity.ok(Map.of(key, value));
     }
 
+    @Operation(summary = ApiDocs.SECRET_DELETE_SUMMARY)
+    @ApiResponse(responseCode = "204", description = ApiDocs.RESP_204)
+    @ApiResponse(responseCode = "500", description = ApiDocs.RESP_500)
     @DeleteMapping("/{path}")
     public ResponseEntity<Void> delete(@PathVariable String path) {
         vaultKVService.deleteSecret(path);
