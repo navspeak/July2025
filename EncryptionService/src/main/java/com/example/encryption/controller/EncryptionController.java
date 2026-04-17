@@ -33,11 +33,11 @@ public class EncryptionController {
     @PostMapping(value = "/decrypt", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<StreamingResponseBody> decrypt(
             @RequestPart("file") MultipartFile file,
-            @RequestParam(value = "keyId", required = false) String keyId) throws Exception {
+            @RequestParam(value = "transitKey", required = false) String transitKey) throws Exception {
 
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=decrypted")
                 .contentType(MediaType.APPLICATION_OCTET_STREAM)
-                .body(fileEncryptionService.decryptFile(file, keyId));
+                .body(fileEncryptionService.decryptFile(file, transitKey));
     }
 }

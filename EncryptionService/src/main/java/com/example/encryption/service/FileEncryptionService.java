@@ -41,16 +41,16 @@ public class FileEncryptionService {
     }
 
     public StreamingResponseBody encryptFile(MultipartFile file, EncryptionRequest request) throws Exception {
-        String keyId = request != null ? request.getKeyId() : null;
-        String fileName = (request != null && request.getFileName() != null)
-                ? request.getFileName() : file.getOriginalFilename();
-        EncryptionAlgorithm algorithm = request != null && request.getAlgorithm() != null
-                ? request.getAlgorithm() : EncryptionAlgorithm.AES_256_GCM;
+        String transitKey = request != null ? request.transitKey() : null;
+        String fileName = (request != null && request.fileName() != null)
+                ? request.fileName() : file.getOriginalFilename();
+        EncryptionAlgorithm algorithm = request != null
+                ? request.algorithm() : EncryptionAlgorithm.AES_256_GCM;
 
         StagingPath paths = fileProcessor.getPaths(file, Operation.ENCRYPT);
         try {
             FileEncryptionContext ctx = encryptionProcessor.initEncrypt(algorithm);
-            String wrappedDek = vaultTransitService.wrapDek(ctx.dekBase64(), keyId);
+            String wrappedDek = vaultTransitService.wrapDek(ctx.dekBase64(), transitKey);
 
             String ivBase64 = Base64.getEncoder().encodeToString(ctx.iv());
             FileEncryptionMetadata metadata = new FileEncryptionMetadata(fileName, ivBase64, wrappedDek, algorithm);
@@ -81,16 +81,15 @@ public class FileEncryptionService {
         }
     }
 
-    public StreamingResponseBody decryptFile(MultipartFile file, String keyId) throws Exception {
+    public StreamingResponseBody decryptFile(MultipartFile file, String transitKey) throws Exception {
         StagingPath paths = fileProcessor.getPaths(file, Operation.DECRYPT);
         try {
             try (InputStream in = Files.newInputStream(paths.inputPath())) {
-                // read 4-byte metadata length
                 int metadataLen = ByteBuffer.wrap(in.readNBytes(4)).getInt();
                 FileEncryptionMetadata metadata = objectMapper.readValue(in.readNBytes(metadataLen),
                         FileEncryptionMetadata.class);
 
-                String dekBase64 = vaultTransitService.unwrapDek(metadata.wrappedDek(), keyId);
+                String dekBase64 = vaultTransitService.unwrapDek(metadata.wrappedDek(), transitKey);
 
                 try (CipherInputStream cis = new CipherInputStream(in,
                         encryptionProcessor.initDecryptCipher(metadata, dekBase64));

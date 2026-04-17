@@ -18,13 +18,13 @@ public class TextEncryptionController {
 
     @PostMapping("/encrypt")
     public ResponseEntity<Map<String, String>> encrypt(@RequestBody Map<String, String> request) {
-        String ciphertext = vaultTransitService.encryptText(request.get("plaintext"), request.get("keyId"));
+        String ciphertext = vaultTransitService.encryptText(request.get("plaintext"), request.get("transitKey"));
         return ResponseEntity.ok(Map.of("ciphertext", ciphertext));
     }
 
     @PostMapping("/decrypt")
     public ResponseEntity<Map<String, String>> decrypt(@RequestBody Map<String, String> request) {
-        String plaintext = vaultTransitService.decryptText(request.get("ciphertext"), request.get("keyId"));
+        String plaintext = vaultTransitService.decryptText(request.get("ciphertext"), request.get("transitKey"));
         return ResponseEntity.ok(Map.of("plaintext", plaintext));
     }
 }
