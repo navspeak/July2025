@@ -40,6 +40,9 @@ management:
       percentiles:
         # Query: GET /actuator/metrics/vault.ops.latency?tag=percentile:0.95
         vault.ops.latency: 0.5, 0.95, 0.99
+        # Query: GET /actuator/metrics/http.server.requests?tag=percentile:0.99&tag=uri:/api/v1/file/encrypt
+        # Filter by status: add &tag=status:400
+        http.server.requests: 0.5, 0.95, 0.99
   zipkin:
     tracing:
       # Option 1 (uncommented): short timeouts so a Zipkin outage fails fast
