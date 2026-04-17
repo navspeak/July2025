@@ -1,70 +1,45 @@
 package com.example.encryption.vault;
 
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestClient;
-
-import java.util.Map;
+import org.springframework.vault.core.VaultTemplate;
+import org.springframework.vault.support.Plaintext;
+import org.springframework.vault.support.Ciphertext;
 
 @Service
 public class VaultTransitService {
 
-    private final RestClient restClient;
-
-    @Value("${vault.approle.role-id}")
-    private String roleId;
-
-    @Value("${vault.approle.secret-id}")
-    private String secretId;
+    private final VaultTemplate vaultTemplate;
 
     @Value("${vault.transit-key:my-key}")
     private String defaultTransitKey;
 
-    public VaultTransitService(@Value("${vault.uri:http://localhost:8200}") String vaultUri) {
-        this.restClient = RestClient.builder()
-                .baseUrl(vaultUri)
-                .defaultHeader("Content-Type", MediaType.APPLICATION_JSON_VALUE)
-                .build();
+    public VaultTransitService(VaultTemplate vaultTemplate) {
+        this.vaultTemplate = vaultTemplate;
     }
 
     public String wrapDek(String dekBase64, String keyName) {
-        String token = authenticate();
-        var response = post(token, "/v1/transit/encrypt/" + resolveKey(keyName),
-                Map.of("plaintext", dekBase64));
-        return (String) data(response).get("ciphertext");
+        return vaultTemplate.opsForTransit()
+                .encrypt(resolveKey(keyName), Plaintext.of(dekBase64))
+                .getCiphertext();
     }
 
     public String unwrapDek(String wrappedDek, String keyName) {
-        String token = authenticate();
-        var response = post(token, "/v1/transit/decrypt/" + resolveKey(keyName),
-                Map.of("ciphertext", wrappedDek));
-        return (String) data(response).get("plaintext");
+        return vaultTemplate.opsForTransit()
+                .decrypt(resolveKey(keyName), Ciphertext.of(wrappedDek))
+                .asString();
     }
 
-    @SuppressWarnings("unchecked")
-    private String authenticate() {
-        var response = restClient.post()
-                .uri("/v1/auth/approle/login")
-                .body(Map.of("role_id", roleId, "secret_id", secretId))
-                .retrieve()
-                .body(Map.class);
-        return (String) ((Map<String, Object>) response.get("auth")).get("client_token");
+    public String encryptText(String plaintext, String keyName) {
+        return vaultTemplate.opsForTransit()
+                .encrypt(resolveKey(keyName), Plaintext.of(plaintext))
+                .getCiphertext();
     }
 
-    @SuppressWarnings("unchecked")
-    private Map<String, Object> post(String token, String path, Map<String, String> body) {
-        return restClient.post()
-                .uri(path)
-                .header("X-Vault-Token", token)
-                .body(body)
-                .retrieve()
-                .body(Map.class);
-    }
-
-    @SuppressWarnings("unchecked")
-    private Map<String, Object> data(Map<String, Object> response) {
-        return (Map<String, Object>) response.get("data");
+    public String decryptText(String ciphertext, String keyName) {
+        return vaultTemplate.opsForTransit()
+                .decrypt(resolveKey(keyName), Ciphertext.of(ciphertext))
+                .asString();
     }
 
     private String resolveKey(String keyName) {

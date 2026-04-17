@@ -1,18 +1,21 @@
 server:
   port: 8081
 
-vault:
-  uri: http://localhost:8200
-  approle:
-    role-id: your-role-id
-    secret-id: your-secret-id
-  transit-key: my-key
-
-staging:
-  dir: /tmp/encryption-staging
-
 spring:
+  vault:
+    uri: http://localhost:8200
+    authentication: APPROLE
+    app-role:
+      role-id: ${VAULT_ROLE_ID:your-role-id}
+      secret-id: ${VAULT_SECRET_ID:your-secret-id}
   servlet:
     multipart:
       max-file-size: 500MB
       max-request-size: 500MB
+
+vault:
+  transit-key: my-key
+  kv-path: secret/encryption/config
+
+staging:
+  dir: /tmp/encryption-staging
