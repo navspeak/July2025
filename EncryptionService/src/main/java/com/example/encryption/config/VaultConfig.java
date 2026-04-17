@@ -60,6 +60,7 @@ public class VaultConfig extends AbstractVaultConfiguration {
         return AppRoleAuthenticationOptions.builder()
                 .roleId(AppRoleAuthenticationOptions.RoleId.provided(vaultProperties.roleId()))
                 .secretId(AppRoleAuthenticationOptions.SecretId.provided(vaultProperties.secretId()))
+                .appRolePath(vaultProperties.authMountPath())
                 .build();
     }
 

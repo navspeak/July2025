@@ -9,6 +9,7 @@ public record VaultProperties(
         String namespace,
         String roleId,
         String secretId,
+        String authMountPath,
         String transitMountPath,
         String kvMountPath,
         String transitKey,
