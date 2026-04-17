@@ -2,6 +2,8 @@ package com.example.encryption.processor;
 
 import com.example.encryption.domain.Operation;
 import com.example.encryption.domain.StagingPath;
+import io.micrometer.tracing.Span;
+import io.micrometer.tracing.Tracer;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.multipart.MultipartFile;
@@ -16,9 +18,20 @@ public class FileProcessor {
     @Value("${staging.dir:/tmp/encryption-staging}")
     private String stagingDir;
 
+    private final Tracer tracer;
+
+    public FileProcessor(Tracer tracer) {
+        this.tracer = tracer;
+    }
+
     public StagingPath getPaths(MultipartFile file, Operation op) throws Exception {
-        String traceId = UUID.randomUUID().toString();
-        String spanId = UUID.randomUUID().toString().substring(0, 8);
+        Span currentSpan = tracer.currentSpan();
+        String traceId = currentSpan != null
+                ? currentSpan.context().traceId()
+                : UUID.randomUUID().toString();
+        String spanId = currentSpan != null
+                ? currentSpan.context().spanId()
+                : UUID.randomUUID().toString().substring(0, 8);
 
         Path baseDir = Path.of(stagingDir);
         Files.createDirectories(baseDir);

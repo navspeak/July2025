@@ -303,3 +303,98 @@ Client → Encryption Service → Vault (AppRole login → client_token)
                             → Vault Transit (wrap/unwrap DEK)
                             → Vault KV (read/write secrets)
 ```
+
+---
+
+## Architecture Notes
+
+### File Size Limit
+
+Maximum file size is **1MB**, enforced at two levels:
+
+| Level | Setting | Effect |
+|-------|---------|--------|
+| Servlet (Spring multipart) | `max-file-size: 1MB` | Rejects oversized uploads immediately with `413` |
+| Multipart threshold | `file-size-threshold: 1MB` | Files under 1MB stay in memory — no temp files written by Tomcat |
+
+Because `file-size-threshold` matches `max-file-size`, the multipart resolver **never writes to disk**. All temp file management is handled explicitly by `FileProcessor`.
+
+---
+
+### Staging Files
+
+Each encrypt/decrypt request writes two files to `${staging.dir}`:
+
+```
+/tmp/encryption-staging/
+  {traceId}-input-{filename}     ← uploaded file
+  {traceId}-output.enc / .dec    ← processed result
+```
+
+Files are named with the **Micrometer traceId** so they can be correlated with logs and traces.
+
+**Normal cleanup** — the `StreamingResponseBody` lambda deletes both files in a `finally` block after streaming completes:
+
+```
+Request → write staging files → stream output → finally: delete staging files
+```
+
+**Orphan cleanup** — if the JVM crashes mid-stream, staging files are left behind. `StagingCleanupJob` runs every hour and deletes any file older than 60 minutes:
+
+| Config | Default | Description |
+|--------|---------|-------------|
+| `staging.cleanup.max-age-minutes` | `60` | Files older than this are eligible for deletion |
+| `staging.cleanup.interval-ms` | `3600000` | How often the cleanup job runs (ms) |
+
+---
+
+### Multipart Temp Files (Tomcat)
+
+Spring Boot's embedded Tomcat writes multipart parts larger than `file-size-threshold` to a temp directory (`java.io.tmpdir`). With `file-size-threshold: 1MB` matching the max upload limit:
+
+- Files ≤ 1MB → held in memory, **no Tomcat temp file created**
+- Files > 1MB → rejected by `max-file-size` before reaching the threshold check
+
+Result: **Tomcat never writes multipart temp files** for this service.
+
+---
+
+### Tracing
+
+Micrometer Brave tracing is enabled with `sampling.probability: 1.0` (100% of requests traced).
+
+- **TraceId** is propagated into `FileProcessor` and used as the staging filename prefix — correlating files on disk with distributed traces
+- Traces are exported to Zipkin at `http://localhost:9411` if running
+- Actuator endpoints exposed: `health`, `info`, `metrics`, `traces`
+
+```bash
+# Start Zipkin locally
+docker run -d -p 9411:9411 openzipkin/zipkin
+```
+
+---
+
+### Encryption Flow
+
+```
+POST /encrypt
+  │
+  ├── FileProcessor       → write input to staging (named by traceId)
+  ├── EncryptionProcessor → generate DEK (AES-256 or ChaCha20 key + 12-byte IV)
+  ├── VaultTransitService → wrap DEK via Vault transit
+  ├── EncryptionProcessor → build FileEncryptionMetadata (fileName, ivBase64, wrappedDek, algorithm)
+  ├── FileProcessor       → write [4-byte len][metadata JSON][CipherOutputStream encrypted bytes]
+  └── StreamingResponseBody → stream output → finally: cleanup staging files
+```
+
+```
+POST /decrypt
+  │
+  ├── FileProcessor       → write encrypted file to staging
+  ├── Read 4 bytes        → metadata length
+  ├── Read N bytes        → parse FileEncryptionMetadata (algorithm, ivBase64, wrappedDek)
+  ├── VaultTransitService → unwrap DEK via Vault transit
+  ├── EncryptionProcessor → init decrypt cipher (algorithm + DEK + IV from metadata)
+  ├── CipherInputStream   → decrypt remaining bytes to staging output
+  └── StreamingResponseBody → stream output → finally: cleanup staging files
+```
