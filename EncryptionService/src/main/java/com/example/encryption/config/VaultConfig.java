@@ -1,10 +1,12 @@
 package com.example.encryption.config;
 
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
+import java.time.Duration;
 import org.springframework.vault.authentication.AppRoleAuthentication;
 import org.springframework.vault.authentication.AppRoleAuthenticationOptions;
+import org.springframework.vault.client.VaultClients;
 import org.springframework.vault.client.VaultEndpoint;
 import org.springframework.vault.core.VaultTemplate;
 
@@ -22,8 +24,11 @@ public class VaultConfig {
                 .secretId(AppRoleAuthenticationOptions.SecretId.provided(vaultProperties.secretId()))
                 .build();
 
+        JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory();
+        requestFactory.setReadTimeout(vaultProperties.readTimeout());
+
         AppRoleAuthentication authentication = new AppRoleAuthentication(
-                options, endpoint.createRestTemplate());
+                options, VaultClients.createRestTemplate(endpoint, requestFactory));
 
         return new VaultTemplate(endpoint, authentication);
     }

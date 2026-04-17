@@ -8,6 +8,7 @@ app:
     secret-id: ${VAULT_SECRET_ID:your-secret-id}
     mount-path: transit
     key-name: my-key
+    read-timeout: 5s
 
 spring:
   servlet:
@@ -19,9 +20,6 @@ spring:
 
 staging:
   dir: /tmp/encryption-staging
-  cleanup:
-    max-age-minutes: 60
-    interval-ms: 3600000
 
 management:
   tracing:

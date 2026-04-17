@@ -1,6 +1,7 @@
 package com.example.encryption.config;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import java.time.Duration;
 
 @ConfigurationProperties(prefix = "app.vault")
 public record VaultProperties(
@@ -8,4 +9,10 @@ public record VaultProperties(
         String roleId,
         String secretId,
         String mountPath,
-        String keyName) {}
+        String keyName,
+        Duration readTimeout) {
+
+    public VaultProperties {
+        readTimeout = readTimeout != null ? readTimeout : Duration.ofSeconds(5);
+    }
+}

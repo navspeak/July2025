@@ -14,24 +14,37 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.stream.Stream;
 
+/**
+ * Cleans up orphaned staging files left behind by abnormal JVM termination.
+ *
+ * Normal flow: staging files (input + output) are created per request under
+ * staging.dir, and deleted in the finally block of StreamingResponseBody after
+ * the response has been fully streamed to the client. Under normal operation no
+ * files accumulate.
+ *
+ * Orphan scenario: if the JVM crashes or is killed mid-stream, the finally block
+ * never runs and staging files are left on disk indefinitely. This job runs hourly
+ * and deletes any file whose creation time is older than max-age-minutes (default 60).
+ *
+ * creationTime is used (not lastModifiedTime) because staging files are written once
+ * and never modified — lastModifiedTime could be unreliable on some filesystems.
+ */
 @Component
 public class StagingCleanupJob {
 
     private static final Logger log = LoggerFactory.getLogger(StagingCleanupJob.class);
+    private static final long CLEANUP_INTERVAL_MS = 3_600_000; // 1 hour
+    private static final long MAX_AGE_MINUTES = 60;
 
     @Value("${staging.dir:/tmp/encryption-staging}")
     private String stagingDir;
 
-    @Value("${staging.cleanup.max-age-minutes:60}")
-    private long maxAgeMinutes;
-
-    // runs every hour
-    @Scheduled(fixedDelayString = "${staging.cleanup.interval-ms:3600000}")
+    @Scheduled(fixedDelay = CLEANUP_INTERVAL_MS)
     public void cleanupOrphanedFiles() {
         Path baseDir = Path.of(stagingDir);
         if (!Files.exists(baseDir)) return;
 
-        Instant cutoff = Instant.now().minus(maxAgeMinutes, ChronoUnit.MINUTES);
+        Instant cutoff = Instant.now().minus(MAX_AGE_MINUTES, ChronoUnit.MINUTES);
         try (Stream<Path> files = Files.list(baseDir)) {
             files.filter(path -> isOlderThan(path, cutoff))
                  .forEach(this::deleteQuietly);
@@ -43,7 +56,7 @@ public class StagingCleanupJob {
     private boolean isOlderThan(Path path, Instant cutoff) {
         try {
             BasicFileAttributes attrs = Files.readAttributes(path, BasicFileAttributes.class);
-            return attrs.lastModifiedTime().toInstant().isBefore(cutoff);
+            return attrs.creationTime().toInstant().isBefore(cutoff);
         } catch (IOException e) {
             return false;
         }

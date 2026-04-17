@@ -83,7 +83,10 @@ public class FileEncryptionService {
                 FileNameUtils.sanitize(file.getOriginalFilename()), Base64.getEncoder().encodeToString(ctx.iv()), wrappedDek, algorithm);
         byte[] metadataBytes = objectMapper.writeValueAsBytes(metadata);
 
-        // Output: [4-byte metadata length][metadata JSON][encrypted file bytes]
+        // Output file layout (paths.outputPath):
+        //   bytes 0-3           : metadata length (4-byte big-endian int)
+        //   bytes 4-(4+N-1)     : metadata JSON (N bytes)
+        //   bytes (4+N) onwards : AES-GCM / ChaCha20 encrypted file content
         try (InputStream in  = Files.newInputStream(paths.inputPath());
              OutputStream out = Files.newOutputStream(paths.outputPath())) {
             out.write(ByteBuffer.allocate(4).putInt(metadataBytes.length).array());
