@@ -20,7 +20,9 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
+import com.example.encryption.util.FileNameUtils;
 import java.util.Base64;
+import java.util.Optional;
 
 @Service
 public class FileEncryptionService {
@@ -41,41 +43,14 @@ public class FileEncryptionService {
     }
 
     public StreamingResponseBody encryptFile(MultipartFile file, EncryptionRequest request) throws Exception {
-        String transitKey = request != null ? request.transitKey() : null;
-        String fileName = (request != null && request.fileName() != null)
-                ? request.fileName() : file.getOriginalFilename();
-        EncryptionAlgorithm algorithm = request != null
-                ? request.algorithm() : EncryptionAlgorithm.AES_256_GCM;
+        Optional<EncryptionRequest> req = Optional.ofNullable(request);
+        String transitKey = req.map(EncryptionRequest::transitKey).orElse(null);
+        EncryptionAlgorithm algorithm = req.map(EncryptionRequest::algorithm).orElse(EncryptionAlgorithm.AES_256_GCM);
 
-        StagingPath paths = fileProcessor.resolvePaths(file, Operation.ENCRYPT);
-        fileProcessor.stageInput(file, paths.inputPath());
+        StagingPath paths = stage(file, Operation.ENCRYPT);
         try {
-            FileEncryptionContext ctx = encryptionProcessor.initEncrypt(algorithm);
-            String wrappedDek = vaultTransitService.wrapDek(ctx.dekBase64(), transitKey);
-
-            String ivBase64 = Base64.getEncoder().encodeToString(ctx.iv());
-            FileEncryptionMetadata metadata = new FileEncryptionMetadata(fileName, ivBase64, wrappedDek, algorithm);
-            byte[] metadataBytes = objectMapper.writeValueAsBytes(metadata);
-
-            // Output format: [4-byte metadata length][metadata JSON][AES-GCM encrypted file]
-            try (InputStream in = Files.newInputStream(paths.inputPath());
-                 OutputStream out = Files.newOutputStream(paths.outputPath())) {
-
-                out.write(ByteBuffer.allocate(4).putInt(metadataBytes.length).array());
-                out.write(metadataBytes);
-
-                try (CipherOutputStream cos = new CipherOutputStream(out, ctx.cipher())) {
-                    in.transferTo(cos);
-                }
-            }
-
-            return outputStream -> {
-                try (InputStream in = Files.newInputStream(paths.outputPath())) {
-                    in.transferTo(outputStream);
-                } finally {
-                    fileProcessor.cleanup(paths);
-                }
-            };
+            writeEncrypted(file, paths, algorithm, transitKey);
+            return streamOutput(paths);
         } catch (Exception e) {
             fileProcessor.cleanup(paths);
             throw e;
@@ -83,33 +58,66 @@ public class FileEncryptionService {
     }
 
     public StreamingResponseBody decryptFile(MultipartFile file, String transitKey) throws Exception {
-        StagingPath paths = fileProcessor.resolvePaths(file, Operation.DECRYPT);
-        fileProcessor.stageInput(file, paths.inputPath());
+        StagingPath paths = stage(file, Operation.DECRYPT);
         try {
-            try (InputStream in = Files.newInputStream(paths.inputPath())) {
-                int metadataLen = ByteBuffer.wrap(in.readNBytes(4)).getInt();
-                FileEncryptionMetadata metadata = objectMapper.readValue(in.readNBytes(metadataLen),
-                        FileEncryptionMetadata.class);
-
-                String dekBase64 = vaultTransitService.unwrapDek(metadata.wrappedDek(), transitKey);
-
-                try (CipherInputStream cis = new CipherInputStream(in,
-                        encryptionProcessor.initDecryptCipher(metadata, dekBase64));
-                     OutputStream out = Files.newOutputStream(paths.outputPath())) {
-                    cis.transferTo(out);
-                }
-            }
-
-            return outputStream -> {
-                try (InputStream in = Files.newInputStream(paths.outputPath())) {
-                    in.transferTo(outputStream);
-                } finally {
-                    fileProcessor.cleanup(paths);
-                }
-            };
+            writeDecrypted(paths, transitKey);
+            return streamOutput(paths);
         } catch (Exception e) {
             fileProcessor.cleanup(paths);
             throw e;
         }
+    }
+
+    private StagingPath stage(MultipartFile file, Operation op) throws Exception {
+        StagingPath paths = fileProcessor.resolvePaths(file, op);
+        fileProcessor.stageInput(file, paths.inputPath());
+        return paths;
+    }
+
+    private void writeEncrypted(MultipartFile file, StagingPath paths,
+                                EncryptionAlgorithm algorithm, String transitKey) throws Exception {
+        FileEncryptionContext ctx = encryptionProcessor.initEncrypt(algorithm);
+        String wrappedDek = vaultTransitService.wrapDek(ctx.dekBase64(), transitKey);
+
+        FileEncryptionMetadata metadata = new FileEncryptionMetadata(
+                FileNameUtils.sanitize(file.getOriginalFilename()), Base64.getEncoder().encodeToString(ctx.iv()), wrappedDek, algorithm);
+        byte[] metadataBytes = objectMapper.writeValueAsBytes(metadata);
+
+        // Output: [4-byte metadata length][metadata JSON][encrypted file bytes]
+        try (InputStream in  = Files.newInputStream(paths.inputPath());
+             OutputStream out = Files.newOutputStream(paths.outputPath())) {
+            out.write(ByteBuffer.allocate(4).putInt(metadataBytes.length).array());
+            out.write(metadataBytes);
+            try (CipherOutputStream cos = new CipherOutputStream(out, ctx.cipher())) {
+                in.transferTo(cos);
+            }
+        }
+    }
+
+    private void writeDecrypted(StagingPath paths, String transitKey) throws Exception {
+        try (InputStream in = Files.newInputStream(paths.inputPath())) {
+            FileEncryptionMetadata metadata = readMetadata(in);
+            String dekBase64 = vaultTransitService.unwrapDek(metadata.wrappedDek(), transitKey);
+            try (CipherInputStream cis = new CipherInputStream(in,
+                         encryptionProcessor.initDecryptCipher(metadata, dekBase64));
+                 OutputStream out = Files.newOutputStream(paths.outputPath())) {
+                cis.transferTo(out);
+            }
+        }
+    }
+
+    private FileEncryptionMetadata readMetadata(InputStream in) throws Exception {
+        int metadataLen = ByteBuffer.wrap(in.readNBytes(4)).getInt();
+        return objectMapper.readValue(in.readNBytes(metadataLen), FileEncryptionMetadata.class);
+    }
+
+    private StreamingResponseBody streamOutput(StagingPath paths) {
+        return outputStream -> {
+            try (InputStream in = Files.newInputStream(paths.outputPath())) {
+                in.transferTo(outputStream);
+            } finally {
+                fileProcessor.cleanup(paths);
+            }
+        };
     }
 }
