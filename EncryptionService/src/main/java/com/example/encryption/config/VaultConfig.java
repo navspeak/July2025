@@ -1,11 +1,11 @@
 package com.example.encryption.config;
 
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.http.client.ClientHttpRequestFactory;
-import org.springframework.http.client.ClientHttpRequestInterceptor;
 import org.springframework.http.client.InterceptingClientHttpRequestFactory;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.scheduling.TaskScheduler;
@@ -35,6 +35,21 @@ import java.util.List;
  *
  * Without LifecycleAwareSessionManager, the token is obtained once and never
  * renewed — any request after TTL expiry would fail with 403.
+ *
+ * URL resolution:
+ *   harness/myproj is part of the mount path, not a Vault namespace.
+ *   All mount paths must include the full prefix, e.g.:
+ *     transit-mount-path: harness/myproj/transit
+ *     kv-mount-path:      harness/myproj/data
+ *
+ *   Spring Vault sends:
+ *     POST https://vault.host:8200/v1/harness/myproj/transit/encrypt/my-key
+ *     GET  https://vault.host:8200/v1/harness/myproj/data/data/{path}
+ *
+ * Vault round-trip metrics:
+ *   Recorded as Micrometer timer: vault.ops.latency (tags: method, status)
+ *   Query via actuator: GET /actuator/metrics/vault.ops.latency
+ *   Example response shows count, mean, max across all Vault HTTP calls.
  */
 @Configuration
 public class VaultConfig extends AbstractVaultConfiguration {
@@ -43,10 +58,12 @@ public class VaultConfig extends AbstractVaultConfiguration {
 
     private final VaultProperties vaultProperties;
     private final TaskScheduler taskScheduler;
+    private final MeterRegistry meterRegistry;
 
-    public VaultConfig(VaultProperties vaultProperties, TaskScheduler taskScheduler) {
+    public VaultConfig(VaultProperties vaultProperties, TaskScheduler taskScheduler, MeterRegistry meterRegistry) {
         this.vaultProperties = vaultProperties;
         this.taskScheduler = taskScheduler;
+        this.meterRegistry = meterRegistry;
     }
 
     @Override
@@ -65,31 +82,25 @@ public class VaultConfig extends AbstractVaultConfiguration {
         return new LifecycleAwareSessionManager(clientAuthentication(), taskScheduler, buildRestTemplate());
     }
 
-    // Vault namespace is sent as X-Vault-Namespace header — mount paths are relative within it.
-    //
-    //   app.vault.url        = https://vault.host:8200
-    //   app.vault.namespace  = harness/myproj
-    //   app.vault.mount-path = transit
-    //
-    //   Spring Vault sends:
-    //     POST https://vault.host:8200/v1/transit/encrypt/mykey
-    //     X-Vault-Namespace: harness/myproj
-    //
-    //   Vault resolves internally to: /v1/harness/myproj/transit/encrypt/mykey
     @Bean
     @Override
     public VaultTemplate vaultTemplate() {
         JdkClientHttpRequestFactory base = new JdkClientHttpRequestFactory();
         base.setReadTimeout(vaultProperties.readTimeout());
 
-        ClientHttpRequestFactory factory = vaultProperties.namespace() != null
-                ? new InterceptingClientHttpRequestFactory(base, List.of(
-                    (request, body, execution) -> {
-                        log.debug("Vault ops: {} {}", request.getMethod(), request.getURI());
-                        request.getHeaders().set("X-Vault-Namespace", vaultProperties.namespace());
-                        return execution.execute(request, body);
-                    }))
-                : base;
+        var factory = new InterceptingClientHttpRequestFactory(base, List.of(
+                (request, body, execution) -> {
+                    log.debug("Vault ops: {} {}", request.getMethod(), request.getURI());
+                    Timer.Sample sample = Timer.start(meterRegistry);
+                    var response = execution.execute(request, body);
+                    sample.stop(Timer.builder("vault.ops.latency")
+                            .tag("method", request.getMethod().name())
+                            .tag("status", String.valueOf(response.getStatusCode().value()))
+                            .register(meterRegistry));
+                    log.debug("Vault ops response: {}", response.getStatusCode());
+                    return response;
+                }
+        ));
 
         return new VaultTemplate(() -> vaultEndpoint(), factory, sessionManager());
     }
@@ -98,12 +109,12 @@ public class VaultConfig extends AbstractVaultConfiguration {
         return AppRoleAuthenticationOptions.builder()
                 .roleId(AppRoleAuthenticationOptions.RoleId.provided(vaultProperties.roleId()))
                 .secretId(AppRoleAuthenticationOptions.SecretId.provided(vaultProperties.secretId()))
-                // Full mount path in URL: POST /v1/auth/<authMountPath>/login — no namespace header needed.
+                // Full mount path in URL: POST /v1/auth/<authMountPath>/login
                 .path(vaultProperties.authMountPath())
                 .build();
     }
 
-    // Auth only — no namespace header; authMountPath is the absolute URL path.
+    // Auth only — plain RestTemplate, no interceptors.
     private RestTemplate buildRestTemplate() {
         JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory();
         requestFactory.setReadTimeout(vaultProperties.readTimeout());

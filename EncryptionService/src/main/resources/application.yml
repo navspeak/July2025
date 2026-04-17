@@ -4,12 +4,12 @@ server:
 app:
   vault:
     url: ${VAULT_URL:http://localhost:8200}
-    namespace: ${VAULT_NAMESPACE:harness/myproj}
+    namespace:
     role-id: ${VAULT_ROLE_ID:your-role-id}
     secret-id: ${VAULT_SECRET_ID:your-secret-id}
     auth-mount-path: ${VAULT_AUTH_MOUNT_PATH:approle}
-    transit-mount-path: transit
-    kv-mount-path: secret
+    transit-mount-path: ${VAULT_TRANSIT_MOUNT_PATH:transit}
+    kv-mount-path: ${VAULT_KV_MOUNT_PATH:secret}
     transit-key: my-key
     read-timeout: 5s
 
@@ -27,11 +27,32 @@ staging:
 management:
   tracing:
     sampling:
+      # 1.0 = trace every request (good for dev/debug, high overhead in prod)
+      # 0.1 = trace 10% of requests (typical prod value)
+      # 0.0 = disable tracing entirely
       probability: 1.0
   endpoints:
     web:
       exposure:
         include: health,info,metrics,traces
+  metrics:
+    distribution:
+      percentiles:
+        # Query: GET /actuator/metrics/vault.ops.latency?tag=percentile:0.95
+        vault.ops.latency: 0.5, 0.95, 0.99
+  zipkin:
+    tracing:
+      # Option 1 (uncommented): short timeouts so a Zipkin outage fails fast
+      # instead of blocking the reporter thread for the default 10s socket timeout
+      connect-timeout: 1s
+      read-timeout: 2s
+      # Option 2: lower sampling to reduce export pressure (set probability above to 0.1)
+      # Option 3: disable export entirely — traces still collected locally, just not shipped
+      # spring.zipkin.sender.type=none  (set in spring section below if needed)
+
+logging:
+  level:
+    com.example.encryption.config.VaultConfig: DEBUG
 
 springdoc:
   swagger-ui:
