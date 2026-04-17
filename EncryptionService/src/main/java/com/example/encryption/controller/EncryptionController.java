@@ -10,7 +10,7 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 
 @RestController
-@RequestMapping("/api/v1")
+@RequestMapping("/api/v1/file")
 public class EncryptionController {
 
     private final FileEncryptionService fileEncryptionService;

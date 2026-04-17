@@ -4,6 +4,23 @@ A Spring Boot service for file and text encryption using AES-256-GCM or ChaCha20
 
 ---
 
+## Endpoint Summary
+
+| Method | Endpoint | Input | Output |
+|--------|----------|-------|--------|
+| `POST` | `/api/v1/file/encrypt` | `multipart: file + optional(algorithm, transitKey)` | Encrypted binary stream |
+| `POST` | `/api/v1/file/decrypt` | `multipart: file + optional ?transitKey` | Decrypted binary stream |
+| `POST` | `/api/v1/text/encrypt` | `{plaintext, transitKey?}` | `{ciphertext}` |
+| `POST` | `/api/v1/text/decrypt` | `{ciphertext, transitKey?}` | `{plaintext}` |
+| `POST` | `/api/v1/secrets/{path}` | `{key: value, ...}` | `204 No Content` |
+| `GET` | `/api/v1/secrets/{path}` | — | `{key: value, ...}` |
+| `GET` | `/api/v1/secrets/{path}/{key}` | — | `{key: value}` |
+| `DELETE` | `/api/v1/secrets/{path}` | — | `204 No Content` |
+
+Swagger UI: `http://localhost:8081/swagger-ui.html`
+
+---
+
 ## Prerequisites
 
 - Java 17
@@ -138,12 +155,12 @@ Encrypts an uploaded file using AES-256-GCM or ChaCha20-Poly1305. DEK is generat
 
 ```bash
 # Encrypt with defaults (AES-256-GCM)
-curl -X POST http://localhost:8081/api/v1/encrypt \
+curl -X POST http://localhost:8081/api/v1/file/encrypt \
   -F "file=@/path/to/file.csv" \
   --output encrypted.enc
 
 # Encrypt with ChaCha20
-curl -X POST http://localhost:8081/api/v1/encrypt \
+curl -X POST http://localhost:8081/api/v1/file/encrypt \
   -F "file=@/path/to/file.csv" \
   -F 'request={"algorithm":"CHACHA20_POLY1305","keyId":"my-key"};type=application/json' \
   --output encrypted.enc
@@ -173,12 +190,12 @@ Decrypts a file previously encrypted by this service. Algorithm and wrapped DEK 
 **Example**
 
 ```bash
-curl -X POST http://localhost:8081/api/v1/decrypt \
+curl -X POST http://localhost:8081/api/v1/file/decrypt \
   -F "file=@encrypted.enc" \
   --output decrypted.csv
 
 # With explicit keyId
-curl -X POST "http://localhost:8081/api/v1/decrypt?keyId=my-key" \
+curl -X POST "http://localhost:8081/api/v1/file/decrypt?keyId=my-key" \
   -F "file=@encrypted.enc" \
   --output decrypted.csv
 ```

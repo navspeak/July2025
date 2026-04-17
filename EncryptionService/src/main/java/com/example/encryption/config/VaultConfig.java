@@ -4,7 +4,6 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.scheduling.TaskScheduler;
-import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 import org.springframework.vault.authentication.AppRoleAuthentication;
 import org.springframework.vault.authentication.AppRoleAuthenticationOptions;
 import org.springframework.vault.authentication.ClientAuthentication;
@@ -55,15 +54,6 @@ public class VaultConfig extends AbstractVaultConfiguration {
     @Override
     public SessionManager sessionManager() {
         return new LifecycleAwareSessionManager(clientAuthentication(), taskScheduler, buildRestTemplate());
-    }
-
-    @Bean
-    public TaskScheduler taskScheduler() {
-        ThreadPoolTaskScheduler scheduler = new ThreadPoolTaskScheduler();
-        scheduler.setPoolSize(1);
-        scheduler.setThreadNamePrefix("vault-session-");
-        scheduler.initialize();
-        return scheduler;
     }
 
     private AppRoleAuthenticationOptions buildOptions() {
