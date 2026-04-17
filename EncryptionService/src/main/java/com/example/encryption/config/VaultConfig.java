@@ -5,6 +5,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.client.ClientHttpRequestFactory;
+import org.springframework.http.client.ClientHttpRequestInterceptor;
+import org.springframework.http.client.InterceptingClientHttpRequestFactory;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.scheduling.TaskScheduler;
 import org.springframework.vault.authentication.AppRoleAuthentication;
@@ -15,9 +17,11 @@ import org.springframework.vault.authentication.SessionManager;
 import org.springframework.vault.client.VaultClients;
 import org.springframework.vault.client.VaultEndpoint;
 import org.springframework.vault.config.AbstractVaultConfiguration;
+import org.springframework.vault.core.VaultTemplate;
 import org.springframework.web.client.RestTemplate;
 
 import java.net.URI;
+import java.util.List;
 
 /**
  * Token acquisition flow:
@@ -61,24 +65,6 @@ public class VaultConfig extends AbstractVaultConfiguration {
         return new LifecycleAwareSessionManager(clientAuthentication(), taskScheduler, buildRestTemplate());
     }
 
-    private AppRoleAuthenticationOptions buildOptions() {
-        return AppRoleAuthenticationOptions.builder()
-                .roleId(AppRoleAuthenticationOptions.RoleId.provided(vaultProperties.roleId()))
-                .secretId(AppRoleAuthenticationOptions.SecretId.provided(vaultProperties.secretId()))
-                // Full mount path in URL: POST /v1/auth/<authMountPath>/login — no namespace header needed.
-                .path(vaultProperties.authMountPath())
-                .build();
-    }
-
-    // Auth RestTemplate — no namespace header; authMountPath is the absolute URL path.
-    private RestTemplate buildRestTemplate() {
-        JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory();
-        requestFactory.setReadTimeout(vaultProperties.readTimeout());
-        return VaultClients.createRestTemplate(vaultEndpoint(), requestFactory);
-    }
-
-    // Called by AbstractVaultConfiguration when building VaultTemplate for transit/KV operations.
-    //
     // Vault namespace is sent as X-Vault-Namespace header — mount paths are relative within it.
     //
     //   app.vault.url        = https://vault.host:8200
@@ -90,16 +76,37 @@ public class VaultConfig extends AbstractVaultConfiguration {
     //     X-Vault-Namespace: harness/myproj
     //
     //   Vault resolves internally to: /v1/harness/myproj/transit/encrypt/mykey
+    @Bean
     @Override
-    protected RestTemplate createRestTemplate(VaultEndpoint endpoint, ClientHttpRequestFactory requestFactory) {
-        RestTemplate restTemplate = super.createRestTemplate(endpoint, requestFactory);
-        if (vaultProperties.namespace() != null) {
-            restTemplate.getInterceptors().add((request, body, execution) -> {
-                log.debug("Vault ops: {} {}", request.getMethod(), request.getURI());
-                request.getHeaders().set("X-Vault-Namespace", vaultProperties.namespace());
-                return execution.execute(request, body);
-            });
-        }
-        return restTemplate;
+    public VaultTemplate vaultTemplate() {
+        JdkClientHttpRequestFactory base = new JdkClientHttpRequestFactory();
+        base.setReadTimeout(vaultProperties.readTimeout());
+
+        ClientHttpRequestFactory factory = vaultProperties.namespace() != null
+                ? new InterceptingClientHttpRequestFactory(base, List.of(
+                    (request, body, execution) -> {
+                        log.debug("Vault ops: {} {}", request.getMethod(), request.getURI());
+                        request.getHeaders().set("X-Vault-Namespace", vaultProperties.namespace());
+                        return execution.execute(request, body);
+                    }))
+                : base;
+
+        return new VaultTemplate(() -> vaultEndpoint(), factory, sessionManager());
+    }
+
+    private AppRoleAuthenticationOptions buildOptions() {
+        return AppRoleAuthenticationOptions.builder()
+                .roleId(AppRoleAuthenticationOptions.RoleId.provided(vaultProperties.roleId()))
+                .secretId(AppRoleAuthenticationOptions.SecretId.provided(vaultProperties.secretId()))
+                // Full mount path in URL: POST /v1/auth/<authMountPath>/login — no namespace header needed.
+                .path(vaultProperties.authMountPath())
+                .build();
+    }
+
+    // Auth only — no namespace header; authMountPath is the absolute URL path.
+    private RestTemplate buildRestTemplate() {
+        JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory();
+        requestFactory.setReadTimeout(vaultProperties.readTimeout());
+        return VaultClients.createRestTemplate(vaultEndpoint(), requestFactory);
     }
 }
