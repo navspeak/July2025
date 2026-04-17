@@ -47,7 +47,8 @@ public class FileEncryptionService {
         EncryptionAlgorithm algorithm = request != null
                 ? request.algorithm() : EncryptionAlgorithm.AES_256_GCM;
 
-        StagingPath paths = fileProcessor.getPaths(file, Operation.ENCRYPT);
+        StagingPath paths = fileProcessor.resolvePaths(file, Operation.ENCRYPT);
+        fileProcessor.stageInput(file, paths.inputPath());
         try {
             FileEncryptionContext ctx = encryptionProcessor.initEncrypt(algorithm);
             String wrappedDek = vaultTransitService.wrapDek(ctx.dekBase64(), transitKey);
@@ -82,7 +83,8 @@ public class FileEncryptionService {
     }
 
     public StreamingResponseBody decryptFile(MultipartFile file, String transitKey) throws Exception {
-        StagingPath paths = fileProcessor.getPaths(file, Operation.DECRYPT);
+        StagingPath paths = fileProcessor.resolvePaths(file, Operation.DECRYPT);
+        fileProcessor.stageInput(file, paths.inputPath());
         try {
             try (InputStream in = Files.newInputStream(paths.inputPath())) {
                 int metadataLen = ByteBuffer.wrap(in.readNBytes(4)).getInt();
