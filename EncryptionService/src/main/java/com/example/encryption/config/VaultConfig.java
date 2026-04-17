@@ -14,16 +14,12 @@ import java.net.URI;
 public class VaultConfig {
 
     @Bean
-    public VaultTemplate vaultTemplate(
-            @Value("${spring.vault.uri:http://localhost:8200}") String vaultUri,
-            @Value("${spring.vault.app-role.role-id}") String roleId,
-            @Value("${spring.vault.app-role.secret-id}") String secretId) {
-
-        VaultEndpoint endpoint = VaultEndpoint.from(URI.create(vaultUri));
+    public VaultTemplate vaultTemplate(VaultProperties vaultProperties) {
+        VaultEndpoint endpoint = VaultEndpoint.from(URI.create(vaultProperties.url()));
 
         AppRoleAuthenticationOptions options = AppRoleAuthenticationOptions.builder()
-                .roleId(AppRoleAuthenticationOptions.RoleId.provided(roleId))
-                .secretId(AppRoleAuthenticationOptions.SecretId.provided(secretId))
+                .roleId(AppRoleAuthenticationOptions.RoleId.provided(vaultProperties.roleId()))
+                .secretId(AppRoleAuthenticationOptions.SecretId.provided(vaultProperties.secretId()))
                 .build();
 
         AppRoleAuthentication authentication = new AppRoleAuthentication(

@@ -1,0 +1,306 @@
+openapi: 3.0.3
+info:
+  title: Encryption Service
+  description: >
+    File and text encryption service using AES-256-GCM or ChaCha20-Poly1305,
+    backed by HashiCorp Vault for key management via the transit engine.
+  version: 1.0.0
+
+tags:
+  - name: File Encryption
+    description: Encrypt and decrypt files using AES-256-GCM or ChaCha20-Poly1305
+  - name: Text Encryption
+    description: Encrypt and decrypt individual text values via Vault transit engine
+  - name: Vault KV
+    description: Read and write secrets in Vault KV v2
+
+paths:
+
+  /api/v1/encrypt:
+    post:
+      tags: [File Encryption]
+      summary: Encrypt a file
+      description: >
+        Encrypts an uploaded file. A DEK is generated per request and wrapped via
+        Vault transit. Output format: [4-byte metadata length][metadata JSON][AES-GCM or
+        ChaCha20 encrypted file bytes]. Algorithm and wrapped DEK are stored in the
+        metadata header so no extra input is needed at decrypt time.
+      operationId: encryptFile
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: File to encrypt (max 1MB)
+                request:
+                  type: object
+                  description: Optional encryption config
+                  properties:
+                    algorithm:
+                      type: string
+                      enum: [AES_256_GCM, CHACHA20_POLY1305]
+                      default: AES_256_GCM
+                    keyId:
+                      type: string
+                      description: Vault transit key name. Defaults to app.vault.key-name
+                    fileName:
+                      type: string
+                      description: Override filename stored in metadata. Defaults to original filename
+      responses:
+        '200':
+          description: Encrypted file stream
+          headers:
+            Content-Disposition:
+              schema:
+                type: string
+                example: attachment; filename=encrypted.enc
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '400':
+          description: Missing or invalid request
+        '413':
+          description: File exceeds 1MB limit
+        '500':
+          description: Encryption or Vault failure
+
+  /api/v1/decrypt:
+    post:
+      tags: [File Encryption]
+      summary: Decrypt a file
+      description: >
+        Decrypts a file previously encrypted by this service. Algorithm and wrapped DEK
+        are read from the file metadata header — no need to specify them in the request.
+      operationId: decryptFile
+      parameters:
+        - name: keyId
+          in: query
+          required: false
+          description: Vault transit key name. Defaults to app.vault.key-name
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Encrypted .enc file produced by POST /api/v1/encrypt
+      responses:
+        '200':
+          description: Decrypted file stream
+          headers:
+            Content-Disposition:
+              schema:
+                type: string
+                example: attachment; filename=decrypted
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '400':
+          description: Invalid or corrupted encrypted file
+        '413':
+          description: File exceeds 1MB limit
+        '500':
+          description: Decryption or Vault failure
+
+  /api/v1/text/encrypt:
+    post:
+      tags: [Text Encryption]
+      summary: Encrypt a text value
+      description: >
+        Encrypts a plaintext string using Vault transit. Useful for encrypting
+        individual field values such as PAN, SSN, or API keys.
+      operationId: encryptText
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [plaintext]
+              properties:
+                plaintext:
+                  type: string
+                  description: Text to encrypt
+                keyId:
+                  type: string
+                  description: Vault transit key name. Defaults to app.vault.key-name
+            example:
+              plaintext: "4111111111111111"
+              keyId: "my-key"
+      responses:
+        '200':
+          description: Vault ciphertext token
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ciphertext:
+                    type: string
+              example:
+                ciphertext: "vault:v1:ABCxyz..."
+        '500':
+          description: Vault failure
+
+  /api/v1/text/decrypt:
+    post:
+      tags: [Text Encryption]
+      summary: Decrypt a text value
+      description: Decrypts a Vault ciphertext token back to its original plaintext value.
+      operationId: decryptText
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ciphertext]
+              properties:
+                ciphertext:
+                  type: string
+                  description: Vault ciphertext token (vault:v1:...)
+                keyId:
+                  type: string
+                  description: Vault transit key name. Defaults to app.vault.key-name
+            example:
+              ciphertext: "vault:v1:ABCxyz..."
+              keyId: "my-key"
+      responses:
+        '200':
+          description: Decrypted plaintext
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  plaintext:
+                    type: string
+              example:
+                plaintext: "4111111111111111"
+        '500':
+          description: Vault failure
+
+  /api/v1/secrets/{path}:
+    post:
+      tags: [Vault KV]
+      summary: Write a secret
+      description: Stores key-value pairs at the given Vault KV v2 path.
+      operationId: writeSecret
+      parameters:
+        - name: path
+          in: path
+          required: true
+          description: Secret path e.g. myapp/config
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+            example:
+              apiKey: "abc123"
+              region: "us-east-1"
+      responses:
+        '204':
+          description: Secret stored
+        '500':
+          description: Vault failure
+
+    get:
+      tags: [Vault KV]
+      summary: Read all keys at a path
+      description: Returns all key-value pairs stored at the given Vault KV v2 path.
+      operationId: readSecret
+      parameters:
+        - name: path
+          in: path
+          required: true
+          description: Secret path e.g. myapp/config
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Secret data
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+              example:
+                apiKey: "abc123"
+                region: "us-east-1"
+        '404':
+          description: Path not found
+        '500':
+          description: Vault failure
+
+    delete:
+      tags: [Vault KV]
+      summary: Delete a secret
+      description: Soft-deletes the latest version at the given Vault KV v2 path.
+      operationId: deleteSecret
+      parameters:
+        - name: path
+          in: path
+          required: true
+          description: Secret path e.g. myapp/config
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Secret deleted
+        '500':
+          description: Vault failure
+
+  /api/v1/secrets/{path}/{key}:
+    get:
+      tags: [Vault KV]
+      summary: Read a single key from a path
+      description: Returns the value of a single key from the given Vault KV v2 path.
+      operationId: readSecretKey
+      parameters:
+        - name: path
+          in: path
+          required: true
+          description: Secret path e.g. myapp/config
+          schema:
+            type: string
+        - name: key
+          in: path
+          required: true
+          description: Key name e.g. apiKey
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Key value
+          content:
+            application/json:
+              schema:
+                type: object
+              example:
+                apiKey: "abc123"
+        '404':
+          description: Path or key not found
+        '500':
+          description: Vault failure

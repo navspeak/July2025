@@ -1,22 +1,21 @@
 server:
   port: 8081
 
-spring:
+app:
   vault:
-    uri: http://localhost:8200
-    authentication: APPROLE
-    app-role:
-      role-id: ${VAULT_ROLE_ID:your-role-id}
-      secret-id: ${VAULT_SECRET_ID:your-secret-id}
+    url: ${VAULT_URL:http://localhost:8200}
+    role-id: ${VAULT_ROLE_ID:your-role-id}
+    secret-id: ${VAULT_SECRET_ID:your-secret-id}
+    mount-path: transit
+    key-name: my-key
+
+spring:
   servlet:
     multipart:
       max-file-size: 1MB
       max-request-size: 1MB
       file-size-threshold: 1MB
 
-vault:
-  transit-key: my-key
-  kv-path: secret/encryption/config
 
 staging:
   dir: /tmp/encryption-staging
@@ -34,7 +33,8 @@ management:
         include: health,info,metrics,traces
 
 springdoc:
-  api-docs:
-    path: /api-docs
   swagger-ui:
     path: /swagger-ui.html
+    url: /openapi.yml
+  api-docs:
+    enabled: false
