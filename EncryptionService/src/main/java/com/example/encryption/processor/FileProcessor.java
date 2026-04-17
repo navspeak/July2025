@@ -11,9 +11,13 @@ import org.springframework.web.multipart.MultipartFile;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.UUID;
+import java.util.regex.Pattern;
 
 @Component
 public class FileProcessor {
+
+    private static final Pattern UNSAFE_CHARS = Pattern.compile("[^a-zA-Z0-9._-]");
+    private static final int MAX_FILENAME_LENGTH = 64;
 
     @Value("${staging.dir:/tmp/encryption-staging}")
     private String stagingDir;
@@ -36,13 +40,20 @@ public class FileProcessor {
         Path baseDir = Path.of(stagingDir);
         Files.createDirectories(baseDir);
 
-        Path inputPath = baseDir.resolve(traceId + "-input-" + file.getOriginalFilename());
+        Path inputPath = baseDir.resolve(traceId + "-input-" + sanitize(file.getOriginalFilename()));
         file.transferTo(inputPath);
 
         String suffix = op == Operation.ENCRYPT ? ".enc" : ".dec";
         Path outputPath = baseDir.resolve(traceId + "-output" + suffix);
 
         return new StagingPath(inputPath, outputPath, traceId, spanId);
+    }
+
+    private String sanitize(String fileName) {
+        if (fileName == null || fileName.isBlank()) return "upload";
+        String name = Path.of(fileName).getFileName().toString(); // strips any path component
+        name = UNSAFE_CHARS.matcher(name).replaceAll("_");
+        return name.length() > MAX_FILENAME_LENGTH ? name.substring(0, MAX_FILENAME_LENGTH) : name;
     }
 
     public void cleanup(StagingPath paths) {
