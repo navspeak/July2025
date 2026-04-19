@@ -62,3 +62,11 @@ springdoc:
     path: /swagger-ui.html
   api-docs:
     enabled: true
+
+---
+spring:
+  config:
+    activate:
+      on-profile: client
+  main:
+    web-application-type: none

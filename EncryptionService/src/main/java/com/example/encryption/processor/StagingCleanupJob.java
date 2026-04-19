@@ -1,7 +1,6 @@
 package com.example.encryption.processor;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -29,10 +28,9 @@ import java.util.stream.Stream;
  * creationTime is used (not lastModifiedTime) because staging files are written once
  * and never modified — lastModifiedTime could be unreliable on some filesystems.
  */
+@Slf4j
 @Component
 public class StagingCleanupJob {
-
-    private static final Logger log = LoggerFactory.getLogger(StagingCleanupJob.class);
     private static final long CLEANUP_INTERVAL_MS = 3_600_000; // 1 hour
     private static final long MAX_AGE_MINUTES = 60;
 

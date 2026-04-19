@@ -1,64 +1,66 @@
 package com.example.encryption.client;
 
+import org.springframework.context.annotation.Primary;
 import org.springframework.core.io.FileSystemResource;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
-import org.springframework.http.client.MultipartBodyBuilder;
 import org.springframework.stereotype.Component;
-import org.springframework.web.client.RestClient;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
+import org.springframework.web.client.RestTemplate;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
+@Primary
 @Component
-public class EncryptionServiceClient {
+public class EncryptionServiceClient implements FileEncryptionClient {
 
-    private final RestClient restClient;
+    private static final String BASE_URL = "http://localhost:8081/api/v1";
+
+    private final RestTemplate restTemplate;
 
     public EncryptionServiceClient() {
-        this.restClient = RestClient.builder()
-                .baseUrl("http://localhost:8081/api/v1")
-                .build();
+        this.restTemplate = new RestTemplate();
     }
 
+    @Override
     public Path encrypt(Path inputFile, String keyId, String algorithm) throws IOException {
-        MultipartBodyBuilder body = new MultipartBodyBuilder();
-        body.part("file", new FileSystemResource(inputFile));
+        MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
+        body.add("file", new FileSystemResource(inputFile));
 
         if (keyId != null || algorithm != null) {
-            String request = buildRequestJson(keyId, algorithm, inputFile.getFileName().toString());
-            body.part("request", request, MediaType.APPLICATION_JSON);
+            HttpHeaders partHeaders = new HttpHeaders();
+            partHeaders.setContentType(MediaType.APPLICATION_JSON);
+            body.add("request", new HttpEntity<>(buildRequestJson(keyId, algorithm, inputFile.getFileName().toString()), partHeaders));
         }
 
-        byte[] encrypted = restClient.post()
-                .uri("/encrypt")
-                .contentType(MediaType.MULTIPART_FORM_DATA)
-                .body(body.build())
-                .retrieve()
-                .body(byte[].class);
-
+        byte[] encrypted = post(BASE_URL + "/encrypt", body, byte[].class);
         Path outputFile = inputFile.resolveSibling(inputFile.getFileName() + ".enc");
         Files.write(outputFile, encrypted);
         return outputFile;
     }
 
+    @Override
     public Path decrypt(Path encryptedFile, String keyId) throws IOException {
-        MultipartBodyBuilder body = new MultipartBodyBuilder();
-        body.part("file", new FileSystemResource(encryptedFile));
+        MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
+        body.add("file", new FileSystemResource(encryptedFile));
 
-        String uri = keyId != null ? "/decrypt?keyId=" + keyId : "/decrypt";
-
-        byte[] decrypted = restClient.post()
-                .uri(uri)
-                .contentType(MediaType.MULTIPART_FORM_DATA)
-                .body(body.build())
-                .retrieve()
-                .body(byte[].class);
+        String uri = BASE_URL + (keyId != null ? "/decrypt?keyId=" + keyId : "/decrypt");
+        byte[] decrypted = post(uri, body, byte[].class);
 
         String originalName = encryptedFile.getFileName().toString().replace(".enc", ".decrypted");
         Path outputFile = encryptedFile.resolveSibling(originalName);
         Files.write(outputFile, decrypted);
         return outputFile;
+    }
+
+    private <T> T post(String url, MultiValueMap<String, Object> body, Class<T> responseType) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.MULTIPART_FORM_DATA);
+        return restTemplate.postForObject(url, new HttpEntity<>(body, headers), responseType);
     }
 
     private String buildRequestJson(String keyId, String algorithm, String fileName) {
