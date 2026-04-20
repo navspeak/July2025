@@ -3,6 +3,7 @@ package com.example.encryption.processor;
 import com.example.encryption.domain.EncryptionAlgorithm;
 import com.example.encryption.domain.FileEncryptionContext;
 import com.example.encryption.domain.FileEncryptionMetadata;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.Cipher;
@@ -15,6 +16,7 @@ import java.security.SecureRandom;
 import java.util.Base64;
 
 @Component
+@Profile("!client")
 public class EncryptionProcessor {
 
     private static final int IV_BYTES = 12;

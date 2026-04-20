@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mvn clean *)",
+      "Bash(powershell *)",
+      "Bash(curl -s http://localhost:8081/actuator/health)"
+    ]
+  }
+}

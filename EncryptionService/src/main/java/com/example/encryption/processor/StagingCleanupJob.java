@@ -2,6 +2,7 @@ package com.example.encryption.processor;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Profile;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -30,6 +31,7 @@ import java.util.stream.Stream;
  */
 @Slf4j
 @Component
+@Profile("!client")
 public class StagingCleanupJob {
     private static final long CLEANUP_INTERVAL_MS = 3_600_000; // 1 hour
     private static final long MAX_AGE_MINUTES = 60;

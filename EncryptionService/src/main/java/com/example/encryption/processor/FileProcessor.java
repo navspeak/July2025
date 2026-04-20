@@ -6,6 +6,7 @@ import com.example.encryption.util.FileNameUtils;
 import io.micrometer.tracing.Span;
 import io.micrometer.tracing.Tracer;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -15,6 +16,7 @@ import java.nio.file.Path;
 import java.util.UUID;
 
 @Component
+@Profile("!client")
 public class FileProcessor {
 
     @Value("${staging.dir:/tmp/encryption-staging}")

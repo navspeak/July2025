@@ -17,41 +17,25 @@ spring:
   servlet:
     multipart:
       max-file-size: 1MB
-      max-request-size: 1MB
+      max-request-size: 2MB
       file-size-threshold: 1MB
-
 
 staging:
   dir: /tmp/encryption-staging
 
 management:
   tracing:
-    sampling:
-      # 1.0 = trace every request (good for dev/debug, high overhead in prod)
-      # 0.1 = trace 10% of requests (typical prod value)
-      # 0.0 = disable tracing entirely
-      probability: 1.0
+    enabled: false
   endpoints:
     web:
       exposure:
-        include: health,info,metrics,traces
+        include: health,info,metrics
   metrics:
     distribution:
       percentiles:
-        # Query: GET /actuator/metrics/vault.ops.latency?tag=percentile:0.95
-        vault.ops.latency: 0.5, 0.95, 0.99
-        # Query: GET /actuator/metrics/http.server.requests?tag=percentile:0.99&tag=uri:/api/v1/file/encrypt
-        # Filter by status: add &tag=status:400
-        http.server.requests: 0.5, 0.95, 0.99
-  zipkin:
-    tracing:
-      # Option 1 (uncommented): short timeouts so a Zipkin outage fails fast
-      # instead of blocking the reporter thread for the default 10s socket timeout
-      connect-timeout: 1s
-      read-timeout: 2s
-      # Option 2: lower sampling to reduce export pressure (set probability above to 0.1)
-      # Option 3: disable export entirely — traces still collected locally, just not shipped
-      # spring.zipkin.sender.type=none  (set in spring section below if needed)
+        # Query: GET /actuator/metrics/http.server.requests.percentile?tag=phi:0.95&tag=uri:/api/v1/file/encrypt
+        "[vault.ops.latency]": 0.5,0.95,0.99
+        "[http.server.requests]": 0.5,0.95,0.99
 
 logging:
   level:

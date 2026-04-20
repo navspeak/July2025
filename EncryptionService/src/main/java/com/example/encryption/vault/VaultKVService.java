@@ -1,6 +1,7 @@
 package com.example.encryption.vault;
 
 import com.example.encryption.config.VaultProperties;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 import org.springframework.vault.core.VaultTemplate;
 import org.springframework.vault.support.Versioned;
@@ -8,6 +9,7 @@ import org.springframework.vault.support.Versioned;
 import java.util.Map;
 
 @Service
+@Profile("!client")
 public class VaultKVService {
 
     private final VaultTemplate vaultTemplate;

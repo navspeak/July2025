@@ -10,6 +10,7 @@ import com.example.encryption.processor.EncryptionProcessor;
 import com.example.encryption.processor.FileProcessor;
 import com.example.encryption.vault.VaultTransitService;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
@@ -25,6 +26,7 @@ import java.util.Base64;
 import java.util.Optional;
 
 @Service
+@Profile("!client")
 public class FileEncryptionService {
 
     private final EncryptionProcessor encryptionProcessor;

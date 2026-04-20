@@ -37,7 +37,7 @@ public class EncryptionServiceClient implements FileEncryptionClient {
             body.add("request", new HttpEntity<>(buildRequestJson(keyId, algorithm, inputFile.getFileName().toString()), partHeaders));
         }
 
-        byte[] encrypted = post(BASE_URL + "/encrypt", body, byte[].class);
+        byte[] encrypted = post(BASE_URL + "/file/encrypt", body, byte[].class);
         Path outputFile = inputFile.resolveSibling(inputFile.getFileName() + ".enc");
         Files.write(outputFile, encrypted);
         return outputFile;
@@ -48,7 +48,7 @@ public class EncryptionServiceClient implements FileEncryptionClient {
         MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
         body.add("file", new FileSystemResource(encryptedFile));
 
-        String uri = BASE_URL + (keyId != null ? "/decrypt?keyId=" + keyId : "/decrypt");
+        String uri = BASE_URL + (keyId != null ? "/file/decrypt?transitKey=" + keyId : "/file/decrypt");
         byte[] decrypted = post(uri, body, byte[].class);
 
         String originalName = encryptedFile.getFileName().toString().replace(".enc", ".decrypted");

@@ -32,7 +32,7 @@ public class RestClientEncryptionClient implements FileEncryptionClient {
         }
 
         byte[] encrypted = restClient.post()
-                .uri("/encrypt")
+                .uri("/file/encrypt")
                 .contentType(MediaType.MULTIPART_FORM_DATA)
                 .body(builder.build())
                 .retrieve()
@@ -48,7 +48,7 @@ public class RestClientEncryptionClient implements FileEncryptionClient {
         MultipartBodyBuilder builder = new MultipartBodyBuilder();
         builder.part("file", new FileSystemResource(encryptedFile));
 
-        String uri = keyId != null ? "/decrypt?keyId=" + keyId : "/decrypt";
+        String uri = keyId != null ? "/file/decrypt?transitKey=" + keyId : "/file/decrypt";
 
         byte[] decrypted = restClient.post()
                 .uri(uri)

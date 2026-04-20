@@ -9,11 +9,13 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.context.annotation.Profile;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
 
 @Tag(name = ApiDocs.TAG_TEXT)
+@Profile("!client")
 @RestController
 @RequestMapping("/api/v1/text")
 public class TextEncryptionController {

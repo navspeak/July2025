@@ -5,6 +5,7 @@ import io.micrometer.core.instrument.Timer;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Profile;
 import org.springframework.http.client.InterceptingClientHttpRequestFactory;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.scheduling.TaskScheduler;
@@ -52,6 +53,7 @@ import java.util.List;
  */
 @Slf4j
 @Configuration
+@Profile("!client")
 public class VaultConfig extends AbstractVaultConfiguration {
 
     private final VaultProperties vaultProperties;

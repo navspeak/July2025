@@ -1,12 +1,14 @@
 package com.example.encryption.vault;
 
 import com.example.encryption.config.VaultProperties;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 import org.springframework.vault.core.VaultTemplate;
 import org.springframework.vault.support.Ciphertext;
 import org.springframework.vault.support.Plaintext;
 
 @Service
+@Profile("!client")
 public class VaultTransitService {
 
     private final VaultTemplate vaultTemplate;

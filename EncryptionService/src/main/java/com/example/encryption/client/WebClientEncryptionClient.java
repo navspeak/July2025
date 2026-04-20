@@ -33,7 +33,7 @@ public class WebClientEncryptionClient implements FileEncryptionClient {
         }
 
         byte[] encrypted = webClient.post()
-                .uri("/encrypt")
+                .uri("/file/encrypt")
                 .contentType(MediaType.MULTIPART_FORM_DATA)
                 .body(BodyInserters.fromMultipartData(builder.build()))
                 .retrieve()
@@ -50,7 +50,7 @@ public class WebClientEncryptionClient implements FileEncryptionClient {
         MultipartBodyBuilder builder = new MultipartBodyBuilder();
         builder.part("file", new FileSystemResource(encryptedFile));
 
-        String uri = keyId != null ? "/decrypt?keyId=" + keyId : "/decrypt";
+        String uri = keyId != null ? "/file/decrypt?transitKey=" + keyId : "/file/decrypt";
 
         byte[] decrypted = webClient.post()
                 .uri(uri)
