@@ -25,17 +25,30 @@ staging:
 
 management:
   tracing:
-    enabled: false
+    sampling:
+      probability: 1.0
   endpoints:
     web:
       exposure:
-        include: health,info,metrics
+        include: health,info,metrics,prometheus
+  zipkin:
+    tracing:
+      endpoint: http://localhost:9411/api/v2/spans
+      connect-timeout: 1s
+      read-timeout: 2s
   metrics:
     distribution:
       percentiles:
         # Query: GET /actuator/metrics/http.server.requests.percentile?tag=phi:0.95&tag=uri:/api/v1/file/encrypt
+        # Query: GET /actuator/metrics/vault.ops.latency.percentile?tag=phi:0.99
+        # Query: GET /actuator/metrics/file.stage.latency.percentile?tag=phi:0.99&tag=operation:encrypt
+        # Query: GET /actuator/metrics/file.cipher.latency.percentile?tag=phi:0.99&tag=operation:encrypt
+        # Query: GET /actuator/metrics/file.stream.latency.percentile?tag=phi:0.99&tag=operation:encrypt
         "[vault.ops.latency]": 0.5,0.95,0.99
         "[http.server.requests]": 0.5,0.95,0.99
+        "[file.stage.latency]": 0.5,0.95,0.99
+        "[file.cipher.latency]": 0.5,0.95,0.99
+        "[file.stream.latency]": 0.5,0.95,0.99
 
 logging:
   level:
