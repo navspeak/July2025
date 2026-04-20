@@ -18,8 +18,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 
-import javax.crypto.CipherInputStream;
-import javax.crypto.CipherOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
@@ -99,15 +97,13 @@ public class FileEncryptionService {
         //   bytes 4-(4+N-1)     : metadata JSON (N bytes)
         //   bytes (4+N) onwards : AES-GCM / ChaCha20 encrypted file content
         Timer.Sample sample = Timer.start(meterRegistry);
-        try (InputStream in  = Files.newInputStream(paths.inputPath());
-             OutputStream out = Files.newOutputStream(paths.outputPath())) {
+        byte[] encrypted = ctx.cipher().doFinal(Files.readAllBytes(paths.inputPath()));
+        sample.stop(timer("file.cipher.latency", "encrypt"));
+        try (OutputStream out = Files.newOutputStream(paths.outputPath())) {
             out.write(ByteBuffer.allocate(4).putInt(metadataBytes.length).array());
             out.write(metadataBytes);
-            try (CipherOutputStream cos = new CipherOutputStream(out, ctx.cipher())) {
-                in.transferTo(cos);
-            }
+            out.write(encrypted);
         }
-        sample.stop(timer("file.cipher.latency", "encrypt"));
     }
 
     private void writeDecrypted(StagingPath paths, String transitKey) throws Exception {
@@ -115,12 +111,10 @@ public class FileEncryptionService {
             FileEncryptionMetadata metadata = readMetadata(in);
             String dekBase64 = vaultTransitService.unwrapDek(metadata.wrappedDek(), transitKey);
             Timer.Sample sample = Timer.start(meterRegistry);
-            try (CipherInputStream cis = new CipherInputStream(in,
-                         encryptionProcessor.initDecryptCipher(metadata, dekBase64));
-                 OutputStream out = Files.newOutputStream(paths.outputPath())) {
-                cis.transferTo(out);
-            }
+            byte[] decrypted = encryptionProcessor.initDecryptCipher(metadata, dekBase64)
+                    .doFinal(in.readAllBytes());
             sample.stop(timer("file.cipher.latency", "decrypt"));
+            Files.write(paths.outputPath(), decrypted);
         }
     }
 
