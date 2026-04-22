@@ -98,6 +98,15 @@ public class FileEncryptionService {
         //   bytes 0-3           : metadata length (4-byte big-endian int)
         //   bytes 4-(4+N-1)     : metadata JSON (N bytes)
         //   bytes (4+N) onwards : AES-GCM / ChaCha20 encrypted file content
+        // doFinal() instead of CipherInputStream: AES-GCM and ChaCha20-Poly1305 both append an auth tag
+        // at the end of the ciphertext. JCE will not release any plaintext until the tag is verified,
+        // so CipherInputStream buffers the entire input internally anyway — with worse latency and
+        // no reduction in memory usage. doFinal() is explicit about the full-buffer contract.
+        //
+        // To support files larger than MAX_FILE_BYTES, switch to a chunked scheme: split the file into
+        // fixed-size chunks (e.g. 64KB), encrypt each chunk independently with its own IV and auth tag,
+        // and write chunk boundaries into the metadata. Decryption then verifies each chunk's tag before
+        // releasing that chunk's plaintext — true streaming with per-chunk integrity.
         assertSafeForDoFinal(paths.inputPath());
         Timer.Sample sample = Timer.start(meterRegistry);
         byte[] encrypted = ctx.cipher().doFinal(Files.readAllBytes(paths.inputPath()));
@@ -114,6 +123,8 @@ public class FileEncryptionService {
         try (InputStream in = Files.newInputStream(paths.inputPath())) {
             FileEncryptionMetadata metadata = readMetadata(in);
             String dekBase64 = vaultTransitService.unwrapDek(metadata.wrappedDek(), transitKey);
+            // Same reasoning as encrypt: GCM/Poly1305 auth tag forces JCE to buffer everything
+            // before releasing plaintext — CipherInputStream gives no streaming benefit here.
             Timer.Sample sample = Timer.start(meterRegistry);
             byte[] decrypted = encryptionProcessor.initDecryptCipher(metadata, dekBase64)
                     .doFinal(in.readAllBytes());
