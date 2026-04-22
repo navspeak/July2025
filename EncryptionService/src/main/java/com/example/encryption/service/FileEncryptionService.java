@@ -29,6 +29,8 @@ import java.util.Optional;
 @Profile("!client")
 public class FileEncryptionService {
 
+    private static final long MAX_FILE_BYTES = 1024 * 1024; // 1 MB — beyond this doFinal() risks OOM under concurrency
+
     private final EncryptionProcessor encryptionProcessor;
     private final FileProcessor fileProcessor;
     private final VaultTransitService vaultTransitService;
@@ -96,6 +98,7 @@ public class FileEncryptionService {
         //   bytes 0-3           : metadata length (4-byte big-endian int)
         //   bytes 4-(4+N-1)     : metadata JSON (N bytes)
         //   bytes (4+N) onwards : AES-GCM / ChaCha20 encrypted file content
+        assertSafeForDoFinal(paths.inputPath());
         Timer.Sample sample = Timer.start(meterRegistry);
         byte[] encrypted = ctx.cipher().doFinal(Files.readAllBytes(paths.inputPath()));
         sample.stop(timer("file.cipher.latency", "encrypt"));
@@ -107,6 +110,7 @@ public class FileEncryptionService {
     }
 
     private void writeDecrypted(StagingPath paths, String transitKey) throws Exception {
+        assertSafeForDoFinal(paths.inputPath());
         try (InputStream in = Files.newInputStream(paths.inputPath())) {
             FileEncryptionMetadata metadata = readMetadata(in);
             String dekBase64 = vaultTransitService.unwrapDek(metadata.wrappedDek(), transitKey);
@@ -115,6 +119,14 @@ public class FileEncryptionService {
                     .doFinal(in.readAllBytes());
             sample.stop(timer("file.cipher.latency", "decrypt"));
             Files.write(paths.outputPath(), decrypted);
+        }
+    }
+
+    private void assertSafeForDoFinal(java.nio.file.Path path) throws Exception {
+        long size = Files.size(path);
+        if (size > MAX_FILE_BYTES) {
+            throw new IllegalArgumentException(
+                    "File size " + size + " bytes exceeds doFinal() safe limit of " + MAX_FILE_BYTES + " bytes");
         }
     }
 
