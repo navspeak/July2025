@@ -17,11 +17,11 @@ import java.util.concurrent.Future;
 import java.util.stream.IntStream;
 
 /**
- * Run with: --spring.profiles.active=client
+ * Run with: --spring.profiles.active=load
  */
 @Component
-@Profile("client")
-public class EncryptionClientRunner implements CommandLineRunner {
+@Profile("load")
+public class LoadTestRunner implements CommandLineRunner {
 
     private static final int WARMUP      = 10;
     private static final int ITERATIONS  = 100;
@@ -30,7 +30,7 @@ public class EncryptionClientRunner implements CommandLineRunner {
 
     private final FileEncryptionClient client;
 
-    public EncryptionClientRunner(FileEncryptionClient client) {
+    public LoadTestRunner(FileEncryptionClient client) {
         this.client = client;
     }
 

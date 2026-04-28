@@ -69,9 +69,14 @@ springdoc:
     enabled: true
 
 ---
+# Profile groups: activating 'load' or 'ping' automatically pulls in 'client' (no-web mode)
 spring:
   config:
     activate:
       on-profile: client
+  profiles:
+    group:
+      load: "client"
+      ping: "client"
   main:
     web-application-type: none
