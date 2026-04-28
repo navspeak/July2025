@@ -9,19 +9,36 @@ public class _Imp_LongestRepeatingCharacterReplacement {
     public static int characterReplacement_Latest(String s, int k){
         Map<Character, Integer> window = new HashMap<>();
         int left = 0, right = 0;
-        int max = 0;
+        int max = 0, maxFreq = 0;
         while(right < s.length()){
-            int maxVal = window.merge(s.charAt(right), 1, Integer::sum);
-            right++;
-            //while(!windowValid(window, left, right, k)){ //Optimize => while to if
-            if(right - left - maxVal > k){
+            int freqOfCurrent = window.merge(s.charAt(right), 1, Integer::sum);
+            maxFreq = Math.max(maxFreq, freqOfCurrent);
+// maxSize cannot grow beyond maxFreq + k unless we later discover
+// a larger real repeated count later in the scan.
+//
+// Example:
+// s = "AABACAAAA", k = 1
+//
+// At window "AABA":
+//   maxFreq = 3 ('A')
+//   so largest possible valid size so far = 3 + 1 = 4
+//
+// Later, when more 'A' appear:
+//   maxFreq becomes 4, then 5
+//   so maxSize can grow to 5, then 6
+// If new/different characters keep appearing,
+//    max size will not increase unless one of them repeats enough to
+//    raise maxFreq above 3.
+// This is why we keep scanning instead of returning early.
+            if(right - left +1 - maxFreq > k){
                 window.compute(s.charAt(left), (key,v) -> {
                     if (v == 1) return null;
                     return v-1;
                 });
                 left++;
             }
-            max = Math.max(max, right-left);
+            max = Math.max(max, right-left+1);
+            right++;
         }
         return max;
 

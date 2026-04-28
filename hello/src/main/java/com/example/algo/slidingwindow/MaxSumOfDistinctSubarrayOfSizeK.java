@@ -15,6 +15,7 @@ public class MaxSumOfDistinctSubarrayOfSizeK {
     Order of Operations: Adding the element first and then checking if the window is too large is the
               standard "Expand then Contract" template for sliding windows.
      */
+    //https://leetcode.com/problems/maximum-sum-of-distinct-subarrays-with-length-k/
     public static long maximumSubarraySum(int[] nums, int k) {
        Set<Integer> window = new HashSet<>(); // using boolean array of size 10^5 will improve perf due to boxing overhead wth set
        int left = 0;

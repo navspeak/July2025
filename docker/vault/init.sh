@@ -11,6 +11,7 @@ path "transit/decrypt/*" { capabilities = ["update"] }
 path "transit/keys/*"    { capabilities = ["read"] }
 path "secret/data/*"     { capabilities = ["create", "read", "update", "delete"] }
 path "secret/metadata/*" { capabilities = ["read", "list", "delete"] }
+path "auth/token/renew-self" { capabilities = ["update"] }
 EOF
 
 vault write auth/approle/role/encryption-service \

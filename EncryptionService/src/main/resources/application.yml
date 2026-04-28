@@ -50,6 +50,14 @@ management:
         "[file.cipher.latency]": 0.5,0.95,0.99
         "[file.stream.latency]": 0.5,0.95,0.99
 
+resilience4j:
+  bulkhead:
+    instances:
+      cipherOps:
+        # Semaphore bulkhead: limits concurrent doFinal() calls to bound heap usage (~2 MB per op)
+        maxConcurrentCalls: 10
+        maxWaitDuration: 0ms   # fail-fast — no queuing; caller gets BulkheadFullException immediately
+
 logging:
   level:
     com.example.encryption.config.VaultConfig: DEBUG

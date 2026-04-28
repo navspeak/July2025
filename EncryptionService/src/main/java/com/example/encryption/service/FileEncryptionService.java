@@ -11,6 +11,8 @@ import com.example.encryption.processor.FileProcessor;
 import com.example.encryption.vault.VaultTransitService;
 import com.example.encryption.util.FileNameUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.github.resilience4j.bulkhead.Bulkhead;
+import io.github.resilience4j.bulkhead.BulkheadRegistry;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import org.springframework.context.annotation.Profile;
@@ -24,12 +26,22 @@ import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.util.Base64;
 import java.util.Optional;
+// import java.util.concurrent.Semaphore;
 
 @Service
 @Profile("!client")
 public class FileEncryptionService {
 
     private static final long MAX_FILE_BYTES = 1024 * 1024; // 1 MB — beyond this doFinal() risks OOM under concurrency
+
+    // Resilience4j semaphore bulkhead — config in application.yml under resilience4j.bulkhead.instances.cipherOps
+    // Limits concurrent doFinal() calls so heap usage stays bounded under load (~2 MB per op × 10 = ~20 MB peak).
+    // Publishes metrics to Micrometer automatically (resilience4j.bulkhead.* tags).
+    private final Bulkhead cipherBulkhead;
+
+    // Alternative: plain Java semaphore — no metrics, no config, but zero dependencies.
+    // private static final int MAX_CONCURRENT_CIPHER_OPS = 10;
+    // private final Semaphore cipherBulkhead = new Semaphore(MAX_CONCURRENT_CIPHER_OPS);
 
     private final EncryptionProcessor encryptionProcessor;
     private final FileProcessor fileProcessor;
@@ -41,12 +53,14 @@ public class FileEncryptionService {
                                  FileProcessor fileProcessor,
                                  VaultTransitService vaultTransitService,
                                  ObjectMapper objectMapper,
-                                 MeterRegistry meterRegistry) {
+                                 MeterRegistry meterRegistry,
+                                 BulkheadRegistry bulkheadRegistry) {
         this.encryptionProcessor = encryptionProcessor;
         this.fileProcessor = fileProcessor;
         this.vaultTransitService = vaultTransitService;
         this.objectMapper = objectMapper;
         this.meterRegistry = meterRegistry;
+        this.cipherBulkhead = bulkheadRegistry.bulkhead("cipherOps");
     }
 
     public StreamingResponseBody encryptFile(MultipartFile file, EncryptionRequest request) throws Exception {
@@ -108,18 +122,27 @@ public class FileEncryptionService {
         // and write chunk boundaries into the metadata. Decryption then verifies each chunk's tag before
         // releasing that chunk's plaintext — true streaming with per-chunk integrity.
         assertSafeForDoFinal(paths.inputPath());
+        cipherBulkhead.acquirePermission(); // throws BulkheadFullException if maxConcurrentCalls exceeded
+        // cipherBulkhead.tryAcquire();     // semaphore equivalent
         Timer.Sample sample = Timer.start(meterRegistry);
-        byte[] encrypted = ctx.cipher().doFinal(Files.readAllBytes(paths.inputPath()));
-        sample.stop(timer("file.cipher.latency", "encrypt"));
-        try (OutputStream out = Files.newOutputStream(paths.outputPath())) {
-            out.write(ByteBuffer.allocate(4).putInt(metadataBytes.length).array());
-            out.write(metadataBytes);
-            out.write(encrypted);
+        try {
+            byte[] encrypted = ctx.cipher().doFinal(Files.readAllBytes(paths.inputPath()));
+            sample.stop(timer("file.cipher.latency", "encrypt"));
+            try (OutputStream out = Files.newOutputStream(paths.outputPath())) {
+                out.write(ByteBuffer.allocate(4).putInt(metadataBytes.length).array());
+                out.write(metadataBytes);
+                out.write(encrypted);
+            }
+        } finally {
+            cipherBulkhead.releasePermission();
+            // cipherBulkhead.release();    // semaphore equivalent
         }
     }
 
     private void writeDecrypted(StagingPath paths, String transitKey) throws Exception {
         assertSafeForDoFinal(paths.inputPath());
+        cipherBulkhead.acquirePermission(); // throws BulkheadFullException if maxConcurrentCalls exceeded
+        // cipherBulkhead.tryAcquire();     // semaphore equivalent
         try (InputStream in = Files.newInputStream(paths.inputPath())) {
             FileEncryptionMetadata metadata = readMetadata(in);
             String dekBase64 = vaultTransitService.unwrapDek(metadata.wrappedDek(), transitKey);
@@ -130,6 +153,9 @@ public class FileEncryptionService {
                     .doFinal(in.readAllBytes());
             sample.stop(timer("file.cipher.latency", "decrypt"));
             Files.write(paths.outputPath(), decrypted);
+        } finally {
+            cipherBulkhead.releasePermission();
+            // cipherBulkhead.release();    // semaphore equivalent
         }
     }
 

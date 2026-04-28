@@ -55,3 +55,8 @@ Thumbs.db
 .env.*
 *.secret
 application-*.properties
+
+# =========================
+# Claude
+# =========================
+.claude/
