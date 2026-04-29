@@ -2,6 +2,7 @@ package com.example.encryption.client;
 
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.http.client.MultipartBodyBuilder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
@@ -22,7 +23,7 @@ public class RestClientEncryptionClient implements FileEncryptionClient {
     }
 
     @Override
-    public Path encrypt(Path inputFile, String keyId, String algorithm) throws IOException {
+    public EncryptionResult encrypt(Path inputFile, String keyId, String algorithm) throws IOException {
         MultipartBodyBuilder builder = new MultipartBodyBuilder();
         builder.part("file", new FileSystemResource(inputFile));
 
@@ -31,36 +32,43 @@ public class RestClientEncryptionClient implements FileEncryptionClient {
                     .contentType(MediaType.APPLICATION_JSON);
         }
 
-        byte[] encrypted = restClient.post()
+        ResponseEntity<byte[]> response = restClient.post()
                 .uri("/file/encrypt")
                 .contentType(MediaType.MULTIPART_FORM_DATA)
                 .body(builder.build())
                 .retrieve()
-                .body(byte[].class);
+                .toEntity(byte[].class);
 
+        String traceId = traceIdFrom(response);
         Path outputFile = inputFile.resolveSibling(inputFile.getFileName() + ".enc");
-        Files.write(outputFile, encrypted);
-        return outputFile;
+        Files.write(outputFile, response.getBody());
+        return new EncryptionResult(outputFile, traceId, response.getStatusCode().value());
     }
 
     @Override
-    public Path decrypt(Path encryptedFile, String keyId) throws IOException {
+    public EncryptionResult decrypt(Path encryptedFile, String keyId) throws IOException {
         MultipartBodyBuilder builder = new MultipartBodyBuilder();
         builder.part("file", new FileSystemResource(encryptedFile));
 
         String uri = keyId != null ? "/file/decrypt?transitKey=" + keyId : "/file/decrypt";
 
-        byte[] decrypted = restClient.post()
+        ResponseEntity<byte[]> response = restClient.post()
                 .uri(uri)
                 .contentType(MediaType.MULTIPART_FORM_DATA)
                 .body(builder.build())
                 .retrieve()
-                .body(byte[].class);
+                .toEntity(byte[].class);
 
+        String traceId = traceIdFrom(response);
         String originalName = encryptedFile.getFileName().toString().replace(".enc", ".decrypted");
         Path outputFile = encryptedFile.resolveSibling(originalName);
-        Files.write(outputFile, decrypted);
-        return outputFile;
+        Files.write(outputFile, response.getBody());
+        return new EncryptionResult(outputFile, traceId, response.getStatusCode().value());
+    }
+
+    private String traceIdFrom(ResponseEntity<?> response) {
+        String traceId = response.getHeaders().getFirst("X-TraceId");
+        return traceId != null ? traceId : "-";
     }
 
     private String buildRequestJson(String keyId, String algorithm, String fileName) {

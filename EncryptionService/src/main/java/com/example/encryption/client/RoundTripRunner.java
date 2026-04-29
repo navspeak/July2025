@@ -34,26 +34,30 @@ public class RoundTripRunner implements CommandLineRunner {
         Path inputFile = Path.of("ping_test.bin");
         Files.write(inputFile, data);
 
-        Path encFile = null;
-        Path decFile = null;
         try {
             long t0 = System.nanoTime();
-            encFile = client.encrypt(inputFile, "my-key", "AES_256_GCM");
+            EncryptionResult enc = client.encrypt(inputFile, "my-key", "AES_256_GCM");
             long encMs = elapsed(t0);
 
-            long t1 = System.nanoTime();
-            decFile = client.decrypt(encFile, "my-key");
-            long decMs = elapsed(t1);
+            long decMs = 0;
+            EncryptionResult dec = null;
+            if (enc.isSuccess() && enc.path() != null) {
+                long t1 = System.nanoTime();
+                dec = client.decrypt(enc.path(), "my-key");
+                decMs = elapsed(t1);
+            }
 
             long roundMs = elapsed(t0);
 
             System.out.printf("%n=== Round-trip ping (file=%d KB) ===%n", FILE_SIZE_BYTES / 1024);
             System.out.printf("  encrypt=%d ms  decrypt=%d ms  total=%d ms%n", encMs, decMs, roundMs);
+            System.out.printf("  traceId=%s  encStatus=%d  decStatus=%s%n",
+                    enc.traceId(),
+                    enc.status(),
+                    dec != null ? dec.status() : "-");
             System.out.println("  Server log: grep \"ROUND_TRIP\" app.log | tail -2");
         } finally {
             Files.deleteIfExists(inputFile);
-            if (encFile != null) Files.deleteIfExists(encFile);
-            if (decFile != null) Files.deleteIfExists(decFile);
         }
     }
 
