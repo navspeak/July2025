@@ -57,6 +57,14 @@ Thumbs.db
 application-*.properties
 
 # =========================
+# SSL
+# =========================
+EncryptionService/src/main/resources/keystore.p12
+*.p12
+*.jks
+*.crt
+
+# =========================
 # Claude
 # =========================
 .claude/

@@ -1,5 +1,13 @@
 server:
   port: 8081
+  # Uncomment to enable SSL (see SSL.md for keystore setup)
+  # port: 8443
+  # ssl:
+  #   key-store: classpath:keystore.p12
+  #   key-store-type: PKCS12
+  #   key-store-password: ${SSL_KEYSTORE_PASSWORD:changeit}
+  #   key-alias: encryption-service
+  #   enabled: true
 
 app:
   vault:
