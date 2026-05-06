@@ -1,4 +1,4 @@
-package com.example.encryption.client;
+package com.example.encryption.runner;
 
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Profile;
@@ -17,15 +17,15 @@ import java.util.concurrent.Future;
 import java.util.stream.IntStream;
 
 /**
- * Run with: --spring.profiles.active=load
+ * Run with: mvn spring-boot:run -Dspring-boot.run.profiles=load -Dspring-boot.run.useTestClasspath=true
  */
 @Component
 @Profile("load")
 public class LoadTestRunner implements CommandLineRunner {
 
-    private static final int WARMUP         = 10;
-    private static final int ITERATIONS     = 100;
-    private static final int CONCURRENCY    = 10;
+    private static final int WARMUP          = 10;
+    private static final int ITERATIONS      = 100;
+    private static final int CONCURRENCY     = 10;
     private static final int FILE_SIZE_BYTES = 900 * 1024; // 900 KB — under 1 MB server limit
 
     private record TaskResult(long encMs, long decMs, long roundMs, String traceId, int encStatus, int decStatus) {}

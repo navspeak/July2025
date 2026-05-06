@@ -70,12 +70,10 @@ resilience4j:
         maxConcurrentCalls: 10
         maxWaitDuration: 0ms   # fail-fast — no queuing; caller gets BulkheadFullException immediately
 
-logging:
-  file:
-    name: app.log
-
 # GC logging — add to JVM args at startup:
 # -Xlog:gc*:file=c:/tm/gc.log:time,uptime:filecount=3,filesize=10m
+
+logging:
   level:
     com.example.encryption.config.VaultConfig: DEBUG
 

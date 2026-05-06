@@ -1,4 +1,4 @@
-package com.example.encryption.client;
+package com.example.encryption.runner;
 
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Profile;
@@ -9,7 +9,7 @@ import java.nio.file.Path;
 import java.util.Random;
 
 /**
- * Run with: --spring.profiles.active=ping
+ * Run with: mvn spring-boot:run -Dspring-boot.run.profiles=ping -Dspring-boot.run.useTestClasspath=true
  *
  * Performs a single encrypt → decrypt cycle and prints client-side timing.
  * Correlate with server logs: grep "ROUND_TRIP" app.log | tail -2

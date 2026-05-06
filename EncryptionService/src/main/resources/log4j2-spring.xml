@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration status="WARN" monitorInterval="30">
+
+    <Properties>
+        <Property name="LOG_PATTERN">%d{ISO8601} %-5level [%t] %logger{36} - %msg%n</Property>
+        <Property name="LOG_FILE">app.log</Property>
+    </Properties>
+
+    <Appenders>
+
+        <Console name="Console" target="SYSTEM_OUT">
+            <PatternLayout pattern="${LOG_PATTERN}"/>
+        </Console>
+
+        <RollingFile name="File"
+                     fileName="${LOG_FILE}"
+                     filePattern="${LOG_FILE}.%d{yyyy-MM-dd}.%i.gz">
+            <PatternLayout pattern="${LOG_PATTERN}"/>
+            <Policies>
+                <TimeBasedTriggeringPolicy interval="1"/>
+                <SizeBasedTriggeringPolicy size="10MB"/>
+            </Policies>
+            <DefaultRolloverStrategy max="7"/>
+        </RollingFile>
+
+        <!-- Async wraps File appender — disruptor-based, garbage-free at high throughput -->
+        <Async name="AsyncFile" includeLocation="false">
+            <AppenderRef ref="File"/>
+        </Async>
+
+    </Appenders>
+
+    <Loggers>
+
+        <Logger name="com.example.encryption" level="INFO" additivity="false">
+            <AppenderRef ref="Console"/>
+            <AppenderRef ref="AsyncFile"/>
+        </Logger>
+
+        <Logger name="com.example.encryption.config.VaultConfig" level="DEBUG" additivity="false">
+            <AppenderRef ref="Console"/>
+            <AppenderRef ref="AsyncFile"/>
+        </Logger>
+
+        <Root level="WARN">
+            <AppenderRef ref="Console"/>
+            <AppenderRef ref="AsyncFile"/>
+        </Root>
+
+    </Loggers>
+
+</Configuration>

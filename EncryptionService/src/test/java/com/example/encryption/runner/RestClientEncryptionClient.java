@@ -1,24 +1,23 @@
-package com.example.encryption.client;
+package com.example.encryption.runner;
 
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.client.MultipartBodyBuilder;
 import org.springframework.stereotype.Component;
-import org.springframework.web.reactive.function.BodyInserters;
-import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.client.RestClient;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
 @Component
-public class WebClientEncryptionClient implements FileEncryptionClient {
+public class RestClientEncryptionClient implements FileEncryptionClient {
 
-    private final WebClient webClient;
+    private final RestClient restClient;
 
-    public WebClientEncryptionClient() {
-        this.webClient = WebClient.builder()
+    public RestClientEncryptionClient() {
+        this.restClient = RestClient.builder()
                 .baseUrl("http://localhost:8081/api/v1")
                 .build();
     }
@@ -33,13 +32,12 @@ public class WebClientEncryptionClient implements FileEncryptionClient {
                     .contentType(MediaType.APPLICATION_JSON);
         }
 
-        ResponseEntity<byte[]> response = webClient.post()
+        ResponseEntity<byte[]> response = restClient.post()
                 .uri("/file/encrypt")
                 .contentType(MediaType.MULTIPART_FORM_DATA)
-                .body(BodyInserters.fromMultipartData(builder.build()))
+                .body(builder.build())
                 .retrieve()
-                .toEntity(byte[].class)
-                .block();
+                .toEntity(byte[].class);
 
         String traceId = traceIdFrom(response);
         Path outputFile = inputFile.resolveSibling(inputFile.getFileName() + ".enc");
@@ -54,13 +52,12 @@ public class WebClientEncryptionClient implements FileEncryptionClient {
 
         String uri = keyId != null ? "/file/decrypt?transitKey=" + keyId : "/file/decrypt";
 
-        ResponseEntity<byte[]> response = webClient.post()
+        ResponseEntity<byte[]> response = restClient.post()
                 .uri(uri)
                 .contentType(MediaType.MULTIPART_FORM_DATA)
-                .body(BodyInserters.fromMultipartData(builder.build()))
+                .body(builder.build())
                 .retrieve()
-                .toEntity(byte[].class)
-                .block();
+                .toEntity(byte[].class);
 
         String traceId = traceIdFrom(response);
         String originalName = encryptedFile.getFileName().toString().replace(".enc", ".decrypted");

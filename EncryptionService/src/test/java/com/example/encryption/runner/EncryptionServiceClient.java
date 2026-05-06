@@ -1,4 +1,4 @@
-package com.example.encryption.client;
+package com.example.encryption.runner;
 
 import org.springframework.context.annotation.Primary;
 import org.springframework.core.io.FileSystemResource;

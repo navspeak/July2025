@@ -1,4 +1,4 @@
-package com.example.encryption.client;
+package com.example.encryption.runner;
 
 import java.io.IOException;
 import java.nio.file.Path;
