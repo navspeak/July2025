@@ -2,7 +2,7 @@
 <Configuration status="WARN" monitorInterval="30">
 
     <Properties>
-        <Property name="LOG_PATTERN">%d{ISO8601} %-5level [%t] %logger{36} - %msg%n</Property>
+        <Property name="LOG_PATTERN">%d{yyyy-MM-dd}-T%d{HH:mm.ss.SSSXXX}, Level=%-5p, Class=%c, Thread=%t, Message=[%m]%n</Property>
         <Property name="LOG_FILE">app.log</Property>
     </Properties>
 

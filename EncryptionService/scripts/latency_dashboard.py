@@ -3,8 +3,8 @@ Latency dashboard from encryption-service ROUND_TRIP logs.
 
 Usage:
     pip install pandas seaborn matplotlib
-    python scripts/latency_dashboard.py                  # reads app.log
-    python scripts/latency_dashboard.py load.log         # reads load.log
+    python scripts/latency_dashboard.py                  # reads LOG_FILE below
+    python scripts/latency_dashboard.py load.log         # override from CLI
     python scripts/latency_dashboard.py app.log --uri /api/v1/file/encrypt
 """
 
@@ -17,8 +17,15 @@ import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 from pathlib import Path
 
+# ── Change this to point to your log file ────────────────────────────────────
+LOG_FILE = "app.log"
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Matches new pattern:
+#   2026-05-06-T15:36.41.240-04:00, Level=INFO , Class=..., Thread=..., Message=[ROUND_TRIP ...]
 LOG_PATTERN = re.compile(
-    r"(?P<timestamp>\d{4}-\d{2}-\d{2}T[\d:.+-]+)\s+\S+\s+.*?ROUND_TRIP\s+"
+    r"(?P<timestamp>\d{4}-\d{2}-\d{2}-T\d{2}:\d{2}\.\d{2}\.\d{3}(?:Z|[+-]\d{2}:\d{2}))"
+    r".*?ROUND_TRIP\s+"
     r"traceId=(?P<traceId>\S+)\s+"
     r"method=(?P<method>\S+)\s+"
     r"uri=(?P<uri>\S+)\s+"
@@ -40,7 +47,8 @@ def parse_log(log_file: str) -> pd.DataFrame:
         sys.exit(1)
 
     df = pd.DataFrame(rows)
-    df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True)
+    # Format: 2026-05-06-T15:36.41.240-04:00  (%f handles 3-digit millis, %z handles ±HH:MM)
+    df["timestamp"] = pd.to_datetime(df["timestamp"], format="%Y-%m-%d-T%H:%M.%S.%f%z", utc=True)
     df["durationMs"] = df["durationMs"].astype(int)
     df["status"] = df["status"].astype(int)
     df["success"] = df["status"] == 200
@@ -109,7 +117,7 @@ def plot_dashboard(df: pd.DataFrame, title: str):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("log_file", nargs="?", default="app.log")
+    parser.add_argument("log_file", nargs="?", default=LOG_FILE)
     parser.add_argument("--uri", help="Filter to a specific URI")
     parser.add_argument("--out", default="latency_dashboard.png")
     args = parser.parse_args()
@@ -121,7 +129,6 @@ def main():
             print(f"No records for uri={args.uri}")
             sys.exit(1)
 
-    # print summary table to console
     print("\n=== Percentile Summary ===")
     print(percentile_summary(df).to_string(index=False))
 

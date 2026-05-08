@@ -1,0 +1,25 @@
+spring:
+  main:
+    web-application-type: none
+  profiles:
+    group:
+      ping: "runner"
+      load: "runner"
+
+---
+spring:
+  config:
+    activate:
+      on-profile: ping
+logging:
+  file:
+    name: ping.log
+
+---
+spring:
+  config:
+    activate:
+      on-profile: load
+logging:
+  file:
+    name: load.log

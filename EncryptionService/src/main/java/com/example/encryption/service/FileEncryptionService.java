@@ -10,7 +10,7 @@ import com.example.encryption.processor.EncryptionProcessor;
 import com.example.encryption.processor.FileProcessor;
 import com.example.encryption.vault.VaultTransitService;
 import com.example.encryption.util.FileNameUtils;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import io.github.resilience4j.bulkhead.Bulkhead;
 import io.github.resilience4j.bulkhead.BulkheadRegistry;
 import io.micrometer.core.instrument.MeterRegistry;

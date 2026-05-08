@@ -22,15 +22,17 @@ app:
     read-timeout: 5s
 
 spring:
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${JWT_ISSUER_URI:https://your-idp.example.com}
+          jwk-set-uri: ${JWT_JWK_SET_URI:https://your-idp.example.com/.well-known/jwks.json}
   servlet:
     multipart:
       max-file-size: 1MB
       max-request-size: 2MB
       file-size-threshold: 1MB
-  profiles:
-    group:
-      load: "client"
-      ping: "client"
 
 staging:
   dir: /tmp/encryption-staging
@@ -43,11 +45,14 @@ management:
     web:
       exposure:
         include: health,info,metrics,prometheus
-  zipkin:
+  otlp:
     tracing:
-      endpoint: http://localhost:9411/api/v2/spans
+      endpoint: http://localhost:4318/v1/traces
       connect-timeout: 1s
       read-timeout: 2s
+    metrics:
+      export:
+        enabled: false
   metrics:
     distribution:
       percentiles:
@@ -83,28 +88,3 @@ springdoc:
   api-docs:
     enabled: true
 
----
-spring:
-  config:
-    activate:
-      on-profile: client
-  main:
-    web-application-type: none
-
----
-spring:
-  config:
-    activate:
-      on-profile: ping
-logging:
-  file:
-    name: ping.log
-
----
-spring:
-  config:
-    activate:
-      on-profile: load
-logging:
-  file:
-    name: load.log
