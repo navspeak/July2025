@@ -12,6 +12,10 @@ public class Collections {
         l.add(10);
         l.add(11);
         l.add(12);
+        l.add(0);
+        System.out.println(l.remove(0)); //print 0
+        System.out.println(Arrays.toString(l.toArray()));
+        System.out.println(l.remove(Integer.valueOf(0))); // prints true
         System.out.println(Arrays.toString(l.toArray()));
 
 //        PriorityQueue<Person> queue = new PriorityQueue<>((p1, p2) -> Integer.compare(p2.getAge(), p1.getAge()));

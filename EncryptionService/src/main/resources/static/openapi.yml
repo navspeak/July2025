@@ -37,7 +37,7 @@ paths:
                 file:
                   type: string
                   format: binary
-                  description: File to encrypt (max 1MB)
+                  description: File to encrypt (max 30MB)
                 request:
                   type: object
                   description: Optional encryption config
@@ -68,7 +68,7 @@ paths:
         '400':
           description: Missing or invalid request
         '413':
-          description: File exceeds 1MB limit
+          description: File exceeds 30MB limit
         '500':
           description: Encryption or Vault failure
 
@@ -115,7 +115,7 @@ paths:
         '400':
           description: Invalid or corrupted encrypted file
         '413':
-          description: File exceeds 1MB limit
+          description: File exceeds 30MB limit
         '500':
           description: Decryption or Vault failure
 

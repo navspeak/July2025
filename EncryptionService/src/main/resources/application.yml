@@ -1,13 +1,11 @@
 server:
-  port: 8081
-  # Uncomment to enable SSL (see SSL.md for keystore setup)
-  # port: 8443
-  # ssl:
-  #   key-store: classpath:keystore.p12
-  #   key-store-type: PKCS12
-  #   key-store-password: ${SSL_KEYSTORE_PASSWORD:changeit}
-  #   key-alias: encryption-service
-  #   enabled: true
+  port: ${SERVER_PORT:8443}
+  ssl:
+    enabled: ${SSL_ENABLED:true}
+    key-store: ${SSL_KEYSTORE_PATH:classpath:keystore.p12}
+    key-store-type: PKCS12
+    key-store-password: ${SSL_KEYSTORE_PASSWORD:changeit}
+    key-alias: ${SSL_KEY_ALIAS:encryption-service}
 
 app:
   vault:
@@ -26,13 +24,18 @@ spring:
     oauth2:
       resourceserver:
         jwt:
-          issuer-uri: ${JWT_ISSUER_URI:https://your-idp.example.com}
-          jwk-set-uri: ${JWT_JWK_SET_URI:https://your-idp.example.com/.well-known/jwks.json}
+          # Local Keycloak (docker/keycloak):
+          #   issuer-uri  : http://localhost:8080/realms/encryption
+          #   jwk-set-uri : http://localhost:8080/realms/encryption/protocol/openid-connect/certs
+          #   audiences   : encryption-service
+          issuer-uri: ${JWT_ISSUER_URI:http://localhost:8080/realms/encryption}
+          jwk-set-uri: ${JWT_JWK_SET_URI:http://localhost:8080/realms/encryption/protocol/openid-connect/certs}
+          audiences: ${JWT_AUDIENCE:encryption-service}
   servlet:
     multipart:
-      max-file-size: 1MB
-      max-request-size: 2MB
-      file-size-threshold: 1MB
+      max-file-size: 30MB
+      max-request-size: 31MB
+      file-size-threshold: 30MB
 
 staging:
   dir: /tmp/encryption-staging
@@ -71,9 +74,13 @@ resilience4j:
   bulkhead:
     instances:
       cipherOps:
-        # Semaphore bulkhead: limits concurrent doFinal() calls to bound heap usage (~2 MB per op)
-        maxConcurrentCalls: 10
+        # Small files (≤ 1 MB): up to 50 concurrent; worst-case heap is 50 × 2 MB = 100 MB (safe with -Xmx3g)
+        maxConcurrentCalls: 50
         maxWaitDuration: 0ms   # fail-fast — no queuing; caller gets BulkheadFullException immediately
+      cipherOpsLarge:
+        # Large files (> 1 MB): capped at 3 to bound heap (~3 × 60 MB = 180 MB peak at 30 MB max)
+        maxConcurrentCalls: 3
+        maxWaitDuration: 0ms
 
 # GC logging — add to JVM args at startup:
 # -Xlog:gc*:file=c:/tm/gc.log:time,uptime:filecount=3,filesize=10m

@@ -32,12 +32,14 @@ import java.util.Optional;
 @Profile("!client")
 public class FileEncryptionService {
 
-    private static final long MAX_FILE_BYTES = 1024 * 1024; // 1 MB — beyond this doFinal() risks OOM under concurrency
+    private static final long MAX_FILE_BYTES   = 30 * 1024 * 1024; // 30 MB
+    private static final long LARGE_FILE_THRESHOLD = 1024 * 1024;  // files above this use the low-concurrency bulkhead
 
-    // Resilience4j semaphore bulkhead — config in application.yml under resilience4j.bulkhead.instances.cipherOps
-    // Limits concurrent doFinal() calls so heap usage stays bounded under load (~2 MB per op × 10 = ~20 MB peak).
-    // Publishes metrics to Micrometer automatically (resilience4j.bulkhead.* tags).
+    // Two bulkheads split by file size so the common case (median ~9 KB) is never throttled by rare large files.
+    // cipherOps      — small files (≤ 1 MB): high concurrency, tiny heap per op (~2 KB–2 MB)
+    // cipherOpsLarge — large files (> 1 MB): low concurrency, caps heap at ~3 × 60 MB = 180 MB peak
     private final Bulkhead cipherBulkhead;
+    private final Bulkhead cipherBulkheadLarge;
 
     // Alternative: plain Java semaphore — no metrics, no config, but zero dependencies.
     // private static final int MAX_CONCURRENT_CIPHER_OPS = 10;
@@ -61,6 +63,11 @@ public class FileEncryptionService {
         this.objectMapper = objectMapper;
         this.meterRegistry = meterRegistry;
         this.cipherBulkhead = bulkheadRegistry.bulkhead("cipherOps");
+        this.cipherBulkheadLarge = bulkheadRegistry.bulkhead("cipherOpsLarge");
+    }
+
+    private Bulkhead selectBulkhead(long fileSize) {
+        return fileSize > LARGE_FILE_THRESHOLD ? cipherBulkheadLarge : cipherBulkhead;
     }
 
     public StreamingResponseBody encryptFile(MultipartFile file, EncryptionRequest request) throws Exception {
@@ -122,8 +129,9 @@ public class FileEncryptionService {
         // and write chunk boundaries into the metadata. Decryption then verifies each chunk's tag before
         // releasing that chunk's plaintext — true streaming with per-chunk integrity.
         assertSafeForDoFinal(paths.inputPath());
-        cipherBulkhead.acquirePermission(); // throws BulkheadFullException if maxConcurrentCalls exceeded
-        // cipherBulkhead.tryAcquire();     // semaphore equivalent
+        long fileSize = Files.size(paths.inputPath());
+        Bulkhead bulkhead = selectBulkhead(fileSize);
+        bulkhead.acquirePermission(); // throws BulkheadFullException if maxConcurrentCalls exceeded
         Timer.Sample sample = Timer.start(meterRegistry);
         try {
             byte[] encrypted = ctx.cipher().doFinal(Files.readAllBytes(paths.inputPath()));
@@ -134,15 +142,15 @@ public class FileEncryptionService {
                 out.write(encrypted);
             }
         } finally {
-            cipherBulkhead.releasePermission();
-            // cipherBulkhead.release();    // semaphore equivalent
+            bulkhead.releasePermission();
         }
     }
 
     private void writeDecrypted(StagingPath paths, String transitKey) throws Exception {
         assertSafeForDoFinal(paths.inputPath());
-        cipherBulkhead.acquirePermission(); // throws BulkheadFullException if maxConcurrentCalls exceeded
-        // cipherBulkhead.tryAcquire();     // semaphore equivalent
+        long fileSize = Files.size(paths.inputPath());
+        Bulkhead bulkhead = selectBulkhead(fileSize);
+        bulkhead.acquirePermission(); // throws BulkheadFullException if maxConcurrentCalls exceeded
         try (InputStream in = Files.newInputStream(paths.inputPath())) {
             FileEncryptionMetadata metadata = readMetadata(in);
             String dekBase64 = vaultTransitService.unwrapDek(metadata.wrappedDek(), transitKey);
@@ -154,8 +162,7 @@ public class FileEncryptionService {
             sample.stop(timer("file.cipher.latency", "decrypt"));
             Files.write(paths.outputPath(), decrypted);
         } finally {
-            cipherBulkhead.releasePermission();
-            // cipherBulkhead.release();    // semaphore equivalent
+            bulkhead.releasePermission();
         }
     }
 

@@ -15,7 +15,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public ResponseEntity<Map<String, String>> handleMaxUploadSizeExceeded(MaxUploadSizeExceededException ex) {
         return ResponseEntity.status(HttpStatus.CONTENT_TOO_LARGE)
-                .body(Map.of("error", "File size exceeds the maximum allowed limit of 1MB"));
+                .body(Map.of("error", "File size exceeds the maximum allowed limit of 30MB"));
     }
 
     // Resilience4j bulkhead is full — server is at max concurrent cipher capacity.

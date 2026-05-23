@@ -8,7 +8,8 @@ The Symptom: You’ll see "Attempt to heart beat failed" or "Rebalance" in the l
 ===
 spring.kafka.consumer.properties.max.poll.interval.ms= 300000 # 5 minutes (default)
         2. The Rebalance Logic (P1=>C1, P2 =>C2, P3=>C3 (slow))
-            --> The Processing Lag: Consumer 3 (C3) fetches a batch of messages. One message is "heavy" (e.g., a long-running DB transaction or a slow API call). The Deadline: The clock for max.poll.interval.ms starts the moment .poll() returns data. If C3 doesn't call .poll() again before the timer hits zero, it is considered a "Lame Duck."
+            --> The Processing Lag: Consumer 3 (C3) fetches a batch of messages. One message is "heavy" (e.g., a long-running DB transaction or a slow API call).
+             The Deadline: The clock for max.poll.interval.ms starts the moment .poll() returns data. If C3 doesn't call .poll() again before the timer hits zero, it is considered a "Lame Duck."
            --> The Eviction: The Broker (Group Coordinator) sees the timeout and says: "C3 is alive (heartbeating) but not working. I'm taking its partitions away."
            --> The Rebalance: P3 is reassigned to C1.
            --> The "Work Theft": C1 now tries to process that same heavy message that C3 was working on.

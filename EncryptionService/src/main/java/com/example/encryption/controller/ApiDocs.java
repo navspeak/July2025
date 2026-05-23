@@ -30,7 +30,7 @@ final class ApiDocs {
     static final String RESP_204        = "No Content";
     static final String RESP_400        = "Missing required field";
     static final String RESP_404        = "Secret path not found";
-    static final String RESP_413        = "File exceeds 1 MB limit";
+    static final String RESP_413        = "File exceeds 30 MB limit";
     static final String RESP_500        = "Vault unreachable or encryption failure";
 
     private ApiDocs() {}
