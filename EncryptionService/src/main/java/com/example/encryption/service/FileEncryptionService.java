@@ -15,6 +15,7 @@ import io.github.resilience4j.bulkhead.Bulkhead;
 import io.github.resilience4j.bulkhead.BulkheadRegistry;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -28,6 +29,7 @@ import java.util.Base64;
 import java.util.Optional;
 // import java.util.concurrent.Semaphore;
 
+@Slf4j
 @Service
 @Profile("!client")
 public class FileEncryptionService {
@@ -64,6 +66,23 @@ public class FileEncryptionService {
         this.meterRegistry = meterRegistry;
         this.cipherBulkhead = bulkheadRegistry.bulkhead("cipherOps");
         this.cipherBulkheadLarge = bulkheadRegistry.bulkhead("cipherOpsLarge");
+        registerBulkheadEvents(this.cipherBulkhead);
+        registerBulkheadEvents(this.cipherBulkheadLarge);
+    }
+
+    private void registerBulkheadEvents(Bulkhead bulkhead) {
+        bulkhead.getEventPublisher()
+            .onCallPermitted(e -> log.debug("[{}] call permitted — inFlight={}/{}",
+                bulkhead.getName(), inFlight(bulkhead), bulkhead.getMetrics().getMaxAllowedConcurrentCalls()))
+            .onCallRejected(e -> log.warn("[{}] call REJECTED — bulkhead full ({}/{})",
+                bulkhead.getName(), inFlight(bulkhead), bulkhead.getMetrics().getMaxAllowedConcurrentCalls()))
+            .onCallFinished(e -> log.debug("[{}] call finished — inFlight={}/{}",
+                bulkhead.getName(), inFlight(bulkhead), bulkhead.getMetrics().getMaxAllowedConcurrentCalls()));
+    }
+
+    private int inFlight(Bulkhead bulkhead) {
+        return bulkhead.getMetrics().getMaxAllowedConcurrentCalls()
+             - bulkhead.getMetrics().getAvailableConcurrentCalls();
     }
 
     private Bulkhead selectBulkhead(long fileSize) {
