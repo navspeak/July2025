@@ -9,12 +9,12 @@ import com.example.encryption.dto.EncryptionRequest;
 import com.example.encryption.processor.EncryptionProcessor;
 import com.example.encryption.processor.FileProcessor;
 import com.example.encryption.vault.VaultTransitService;
+import com.example.encryption.util.CipherBulkhead;
 import com.example.encryption.util.FileNameUtils;
 import tools.jackson.databind.ObjectMapper;
-import io.github.resilience4j.bulkhead.Bulkhead;
-import io.github.resilience4j.bulkhead.BulkheadRegistry;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
+import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
@@ -27,67 +27,21 @@ import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.util.Base64;
 import java.util.Optional;
-// import java.util.concurrent.Semaphore;
 
 @Slf4j
+@AllArgsConstructor
 @Service
 @Profile("!client")
 public class FileEncryptionService {
 
-    private static final long MAX_FILE_BYTES   = 30 * 1024 * 1024; // 30 MB
-    private static final long LARGE_FILE_THRESHOLD = 1024 * 1024;  // files above this use the low-concurrency bulkhead
-
-    // Two bulkheads split by file size so the common case (median ~9 KB) is never throttled by rare large files.
-    // cipherOps      — small files (≤ 1 MB): high concurrency, tiny heap per op (~2 KB–2 MB)
-    // cipherOpsLarge — large files (> 1 MB): low concurrency, caps heap at ~3 × 60 MB = 180 MB peak
-    private final Bulkhead cipherBulkhead;
-    private final Bulkhead cipherBulkheadLarge;
-
-    // Alternative: plain Java semaphore — no metrics, no config, but zero dependencies.
-    // private static final int MAX_CONCURRENT_CIPHER_OPS = 10;
-    // private final Semaphore cipherBulkhead = new Semaphore(MAX_CONCURRENT_CIPHER_OPS);
+    private static final long MAX_FILE_BYTES = 30 * 1024 * 1024; // 30 MB
 
     private final EncryptionProcessor encryptionProcessor;
     private final FileProcessor fileProcessor;
     private final VaultTransitService vaultTransitService;
     private final ObjectMapper objectMapper;
     private final MeterRegistry meterRegistry;
-
-    public FileEncryptionService(EncryptionProcessor encryptionProcessor,
-                                 FileProcessor fileProcessor,
-                                 VaultTransitService vaultTransitService,
-                                 ObjectMapper objectMapper,
-                                 MeterRegistry meterRegistry,
-                                 BulkheadRegistry bulkheadRegistry) {
-        this.encryptionProcessor = encryptionProcessor;
-        this.fileProcessor = fileProcessor;
-        this.vaultTransitService = vaultTransitService;
-        this.objectMapper = objectMapper;
-        this.meterRegistry = meterRegistry;
-        this.cipherBulkhead = bulkheadRegistry.bulkhead("cipherOps");
-        this.cipherBulkheadLarge = bulkheadRegistry.bulkhead("cipherOpsLarge");
-        registerBulkheadEvents(this.cipherBulkhead);
-        registerBulkheadEvents(this.cipherBulkheadLarge);
-    }
-
-    private void registerBulkheadEvents(Bulkhead bulkhead) {
-        bulkhead.getEventPublisher()
-            .onCallPermitted(e -> log.debug("[{}] call permitted — inFlight={}/{}",
-                bulkhead.getName(), inFlight(bulkhead), bulkhead.getMetrics().getMaxAllowedConcurrentCalls()))
-            .onCallRejected(e -> log.warn("[{}] call REJECTED — bulkhead full ({}/{})",
-                bulkhead.getName(), inFlight(bulkhead), bulkhead.getMetrics().getMaxAllowedConcurrentCalls()))
-            .onCallFinished(e -> log.debug("[{}] call finished — inFlight={}/{}",
-                bulkhead.getName(), inFlight(bulkhead), bulkhead.getMetrics().getMaxAllowedConcurrentCalls()));
-    }
-
-    private int inFlight(Bulkhead bulkhead) {
-        return bulkhead.getMetrics().getMaxAllowedConcurrentCalls()
-             - bulkhead.getMetrics().getAvailableConcurrentCalls();
-    }
-
-    private Bulkhead selectBulkhead(long fileSize) {
-        return fileSize > LARGE_FILE_THRESHOLD ? cipherBulkheadLarge : cipherBulkhead;
-    }
+    private final CipherBulkhead cipherBulkhead;
 
     public StreamingResponseBody encryptFile(MultipartFile file, EncryptionRequest request) throws Exception {
         Optional<EncryptionRequest> req = Optional.ofNullable(request);
@@ -149,10 +103,8 @@ public class FileEncryptionService {
         // releasing that chunk's plaintext — true streaming with per-chunk integrity.
         assertSafeForDoFinal(paths.inputPath());
         long fileSize = Files.size(paths.inputPath());
-        Bulkhead bulkhead = selectBulkhead(fileSize);
-        bulkhead.acquirePermission(); // throws BulkheadFullException if maxConcurrentCalls exceeded
         Timer.Sample sample = Timer.start(meterRegistry);
-        try {
+        cipherBulkhead.execute(fileSize, () -> {
             byte[] encrypted = ctx.cipher().doFinal(Files.readAllBytes(paths.inputPath()));
             sample.stop(timer("file.cipher.latency", "encrypt"));
             try (OutputStream out = Files.newOutputStream(paths.outputPath())) {
@@ -160,29 +112,28 @@ public class FileEncryptionService {
                 out.write(metadataBytes);
                 out.write(encrypted);
             }
-        } finally {
-            bulkhead.releasePermission();
-        }
+            long encryptedSize = 4L + metadataBytes.length + encrypted.length;
+            log.debug("[encrypt] {} → {} bytes (+{:.1f}%)",
+                fileSize, encryptedSize, (encryptedSize - fileSize) * 100.0 / fileSize);
+        });
     }
 
     private void writeDecrypted(StagingPath paths, String transitKey) throws Exception {
         assertSafeForDoFinal(paths.inputPath());
         long fileSize = Files.size(paths.inputPath());
-        Bulkhead bulkhead = selectBulkhead(fileSize);
-        bulkhead.acquirePermission(); // throws BulkheadFullException if maxConcurrentCalls exceeded
-        try (InputStream in = Files.newInputStream(paths.inputPath())) {
-            FileEncryptionMetadata metadata = readMetadata(in);
-            String dekBase64 = vaultTransitService.unwrapDek(metadata.wrappedDek(), transitKey);
-            // Same reasoning as encrypt: GCM/Poly1305 auth tag forces JCE to buffer everything
-            // before releasing plaintext — CipherInputStream gives no streaming benefit here.
-            Timer.Sample sample = Timer.start(meterRegistry);
-            byte[] decrypted = encryptionProcessor.initDecryptCipher(metadata, dekBase64)
-                    .doFinal(in.readAllBytes());
-            sample.stop(timer("file.cipher.latency", "decrypt"));
-            Files.write(paths.outputPath(), decrypted);
-        } finally {
-            bulkhead.releasePermission();
-        }
+        cipherBulkhead.execute(fileSize, () -> {
+            try (InputStream in = Files.newInputStream(paths.inputPath())) {
+                FileEncryptionMetadata metadata = readMetadata(in);
+                String dekBase64 = vaultTransitService.unwrapDek(metadata.wrappedDek(), transitKey);
+                // Same reasoning as encrypt: GCM/Poly1305 auth tag forces JCE to buffer everything
+                // before releasing plaintext — CipherInputStream gives no streaming benefit here.
+                Timer.Sample sample = Timer.start(meterRegistry);
+                byte[] decrypted = encryptionProcessor.initDecryptCipher(metadata, dekBase64)
+                        .doFinal(in.readAllBytes());
+                sample.stop(timer("file.cipher.latency", "decrypt"));
+                Files.write(paths.outputPath(), decrypted);
+            }
+        });
     }
 
     private void assertSafeForDoFinal(java.nio.file.Path path) throws Exception {
