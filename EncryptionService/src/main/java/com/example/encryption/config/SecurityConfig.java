@@ -15,7 +15,7 @@ import org.springframework.security.web.SecurityFilterChain;
 @Slf4j
 @Configuration
 @EnableWebSecurity
-@Profile("!client & !runner & !load & !ping")
+@Profile("!client & !runner & !load")
 public class SecurityConfig {
 
     @Bean

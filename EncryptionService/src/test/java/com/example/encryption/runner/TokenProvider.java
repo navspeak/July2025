@@ -10,7 +10,7 @@ import java.time.Instant;
 import java.util.Map;
 
 @Component
-@Profile("runner | load | ping")
+@Profile("runner | load")
 public class TokenProvider {
 
     private final RunnerProperties.Jwt props;

@@ -18,27 +18,68 @@ import java.util.stream.IntStream;
 
 /**
  * Run with: mvn spring-boot:run -Dspring-boot.run.profiles=load -Dspring-boot.run.useTestClasspath=true
+ * Pass mode as first argument via -Dspring-boot.run.arguments=<mode>:
+ *   roundtrip (default) — single encrypt→decrypt cycle, prints latency
+ *   load                — concurrent encrypt→decrypt, prints percentile stats
  */
 @Component
 @Profile("load")
-public class LoadTestRunner implements CommandLineRunner {
+public class EncryptionBenchmarkRunner implements CommandLineRunner {
 
-    private record TaskResult(long encMs, long decMs, long roundMs, String traceId, int encStatus, int decStatus) {}
+    private record TaskResult(long encMs, long decMs, String traceId, int encStatus, int decStatus) {}
 
     private final FileEncryptionClient client;
     private final RunnerProperties.Load load;
 
-    public LoadTestRunner(FileEncryptionClient client, RunnerProperties props) {
-        System.err.println("DEBUG: LoadTestRunner constructed, load=" + props.load());
+    public EncryptionBenchmarkRunner(FileEncryptionClient client, RunnerProperties props) {
         this.client = client;
         this.load = props.load();
     }
 
     @Override
     public void run(String... args) throws Exception {
-        System.err.println("DEBUG: LoadTestRunner.run() called, load=" + load);
-        int fileSizeBytes = load.fileSizeKb() * 1024;
-        byte[] data = new byte[fileSizeBytes];
+        String mode = args.length > 0 ? args[0].toLowerCase() : "roundtrip";
+        if ("load".equals(mode)) {
+            runLoadTest();
+        } else {
+            runRoundTrip();
+        }
+    }
+
+    private void runRoundTrip() throws Exception {
+        byte[] data = new byte[load.fileSizeKb() * 1024];
+        new Random().nextBytes(data);
+
+        Path inputFile = Path.of("roundtrip_test.bin");
+        Files.write(inputFile, data);
+
+        try {
+            long t0 = System.nanoTime();
+            EncryptionResult enc = client.encrypt(inputFile, "my-key", "AES_256_GCM");
+            long encMs = elapsed(t0);
+
+            long decMs = 0;
+            EncryptionResult dec = null;
+            if (enc.isSuccess() && enc.path() != null) {
+                long t1 = System.nanoTime();
+                dec = client.decrypt(enc.path(), "my-key");
+                decMs = elapsed(t1);
+                if (dec.path() != null) Files.deleteIfExists(dec.path());
+                Files.deleteIfExists(enc.path());
+            }
+
+            System.out.printf("%n=== Round-trip (file=%d KB) ===%n", load.fileSizeKb());
+            System.out.printf("  encrypt=%d ms  decrypt=%d ms  total=%d ms%n",
+                    encMs, decMs, encMs + decMs);
+            System.out.printf("  traceId=%s  encStatus=%d  decStatus=%s%n",
+                    enc.traceId(), enc.status(), dec != null ? dec.status() : "-");
+        } finally {
+            Files.deleteIfExists(inputFile);
+        }
+    }
+
+    private void runLoadTest() throws Exception {
+        byte[] data = new byte[load.fileSizeKb() * 1024];
         new Random().nextBytes(data);
 
         System.out.printf("Warming up with %d sequential iterations...%n", load.warmup());
@@ -62,15 +103,12 @@ public class LoadTestRunner implements CommandLineRunner {
                     Path taskFile = Path.of("bench_" + i + ".bin");
                     Files.write(taskFile, data);
                     try {
-                        long roundStart = System.nanoTime();
-
                         long t0 = System.nanoTime();
                         EncryptionResult enc = client.encrypt(taskFile, "my-key", "AES_256_GCM");
                         long encMs = elapsed(t0);
 
                         long decMs = 0;
                         int decStatus = -1;
-
                         if (enc.isSuccess() && enc.path() != null) {
                             long t1 = System.nanoTime();
                             EncryptionResult dec = client.decrypt(enc.path(), "my-key");
@@ -80,8 +118,7 @@ public class LoadTestRunner implements CommandLineRunner {
                             Files.deleteIfExists(enc.path());
                         }
 
-                        long roundMs = elapsed(roundStart);
-                        return new TaskResult(encMs, decMs, roundMs, enc.traceId(), enc.status(), decStatus);
+                        return new TaskResult(encMs, decMs, enc.traceId(), enc.status(), decStatus);
                     } finally {
                         Files.deleteIfExists(taskFile);
                     }
@@ -92,31 +129,19 @@ public class LoadTestRunner implements CommandLineRunner {
         List<Future<TaskResult>> futures = pool.invokeAll(tasks);
         pool.shutdown();
 
-        List<Long> encryptLatencies   = new ArrayList<>(load.iterations());
-        List<Long> decryptLatencies   = new ArrayList<>(load.iterations());
-        List<Long> roundTripLatencies = new ArrayList<>(load.iterations());
-        List<TaskResult> failures     = new ArrayList<>();
-        TaskResult slowest = null;
+        List<Long> encryptLatencies = new ArrayList<>(load.iterations());
+        List<Long> decryptLatencies = new ArrayList<>(load.iterations());
+        List<TaskResult> failures = new ArrayList<>();
 
         for (Future<TaskResult> f : futures) {
             TaskResult r = f.get();
             if (r.encStatus() == 200) encryptLatencies.add(r.encMs());
             if (r.decStatus() == 200) decryptLatencies.add(r.decMs());
-            if (r.encStatus() == 200 && r.decStatus() == 200) {
-                roundTripLatencies.add(r.roundMs());
-                if (slowest == null || r.roundMs() > slowest.roundMs()) slowest = r;
-            }
             if (r.encStatus() != 200 || r.decStatus() != 200) failures.add(r);
         }
 
-        printStats("Encrypt   ", encryptLatencies);
-        printStats("Decrypt   ", decryptLatencies);
-        printStats("Round-trip", roundTripLatencies);
-
-        if (slowest != null) {
-            System.out.printf("%nSlowest: traceId=%s  encMs=%d  decMs=%d  roundMs=%d%n",
-                    slowest.traceId(), slowest.encMs(), slowest.decMs(), slowest.roundMs());
-        }
+        printStats("Encrypt", encryptLatencies);
+        printStats("Decrypt", decryptLatencies);
 
         if (!failures.isEmpty()) {
             System.out.printf("%nNon-200 responses (%d / %d):%n", failures.size(), load.iterations());

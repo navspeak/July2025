@@ -19,7 +19,7 @@ import java.security.cert.X509Certificate;
 
 @Primary
 @Component
-@Profile("runner | load | ping")
+@Profile("runner | load")
 public class EncryptionServiceClient implements FileEncryptionClient {
 
     private final String baseUrl;

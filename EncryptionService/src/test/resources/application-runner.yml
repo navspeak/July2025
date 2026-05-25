@@ -22,15 +22,6 @@ runner:
 spring:
   config:
     activate:
-      on-profile: ping
-logging:
-  file:
-    name: ping.log
-
----
-spring:
-  config:
-    activate:
       on-profile: load
 logging:
   file:
