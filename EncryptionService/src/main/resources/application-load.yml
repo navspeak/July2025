@@ -2,43 +2,21 @@ spring:
   main:
     web-application-type: none
 
----
-spring:
-  config:
-    activate:
-      on-profile: runner
-
 runner:
   service:
     base-url: https://localhost:8443/api/v1
-    skip-ssl-verify: true          # set false when using a trusted cert
+    skip-ssl-verify: true
   jwt:
     token-uri: http://localhost:8080/realms/encryption/protocol/openid-connect/token
     client-id: encryption-runner
     client-secret: changeit
     grant-type: client_credentials
-
----
-spring:
-  config:
-    activate:
-      on-profile: ping
-logging:
-  file:
-    name: ping.log
-
----
-spring:
-  config:
-    activate:
-      on-profile: load
-logging:
-  file:
-    name: load.log
-
-runner:
   load:
     file-size-kb: 900
     concurrency: 10
     iterations: 100
     warmup: 10
+
+logging:
+  file:
+    name: load.log

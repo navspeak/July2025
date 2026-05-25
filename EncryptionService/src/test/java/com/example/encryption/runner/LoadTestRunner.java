@@ -23,26 +23,26 @@ import java.util.stream.IntStream;
 @Profile("load")
 public class LoadTestRunner implements CommandLineRunner {
 
-    private static final int WARMUP          = 10;
-    private static final int ITERATIONS      = 100;
-    private static final int CONCURRENCY     = 10;
-    private static final int FILE_SIZE_BYTES = 900 * 1024; // 900 KB — under 1 MB server limit
-
     private record TaskResult(long encMs, long decMs, long roundMs, String traceId, int encStatus, int decStatus) {}
 
     private final FileEncryptionClient client;
+    private final RunnerProperties.Load load;
 
-    public LoadTestRunner(FileEncryptionClient client) {
+    public LoadTestRunner(FileEncryptionClient client, RunnerProperties props) {
+        System.err.println("DEBUG: LoadTestRunner constructed, load=" + props.load());
         this.client = client;
+        this.load = props.load();
     }
 
     @Override
     public void run(String... args) throws Exception {
-        byte[] data = new byte[FILE_SIZE_BYTES];
+        System.err.println("DEBUG: LoadTestRunner.run() called, load=" + load);
+        int fileSizeBytes = load.fileSizeKb() * 1024;
+        byte[] data = new byte[fileSizeBytes];
         new Random().nextBytes(data);
 
-        System.out.printf("Warming up with %d sequential iterations...%n", WARMUP);
-        for (int i = 0; i < WARMUP; i++) {
+        System.out.printf("Warming up with %d sequential iterations...%n", load.warmup());
+        for (int i = 0; i < load.warmup(); i++) {
             Path f = Path.of("warmup_" + i + ".bin");
             Files.write(f, data);
             EncryptionResult enc = client.encrypt(f, "my-key", "AES_256_GCM");
@@ -54,9 +54,10 @@ public class LoadTestRunner implements CommandLineRunner {
             Files.deleteIfExists(f);
         }
 
-        System.out.printf("Running %d iterations with concurrency=%d...%n", ITERATIONS, CONCURRENCY);
+        System.out.printf("Running %d iterations with concurrency=%d, fileSize=%d KB...%n",
+                load.iterations(), load.concurrency(), load.fileSizeKb());
 
-        List<Callable<TaskResult>> tasks = IntStream.range(0, ITERATIONS)
+        List<Callable<TaskResult>> tasks = IntStream.range(0, load.iterations())
                 .<Callable<TaskResult>>mapToObj(i -> () -> {
                     Path taskFile = Path.of("bench_" + i + ".bin");
                     Files.write(taskFile, data);
@@ -87,13 +88,13 @@ public class LoadTestRunner implements CommandLineRunner {
                 })
                 .toList();
 
-        ExecutorService pool = Executors.newFixedThreadPool(CONCURRENCY);
+        ExecutorService pool = Executors.newFixedThreadPool(load.concurrency());
         List<Future<TaskResult>> futures = pool.invokeAll(tasks);
         pool.shutdown();
 
-        List<Long> encryptLatencies   = new ArrayList<>(ITERATIONS);
-        List<Long> decryptLatencies   = new ArrayList<>(ITERATIONS);
-        List<Long> roundTripLatencies = new ArrayList<>(ITERATIONS);
+        List<Long> encryptLatencies   = new ArrayList<>(load.iterations());
+        List<Long> decryptLatencies   = new ArrayList<>(load.iterations());
+        List<Long> roundTripLatencies = new ArrayList<>(load.iterations());
         List<TaskResult> failures     = new ArrayList<>();
         TaskResult slowest = null;
 
@@ -118,7 +119,7 @@ public class LoadTestRunner implements CommandLineRunner {
         }
 
         if (!failures.isEmpty()) {
-            System.out.printf("%nNon-200 responses (%d / %d):%n", failures.size(), ITERATIONS);
+            System.out.printf("%nNon-200 responses (%d / %d):%n", failures.size(), load.iterations());
             failures.forEach(r -> System.out.printf("  traceId=%s  encStatus=%d  decStatus=%d%n",
                     r.traceId(), r.encStatus(), r.decStatus()));
         }
@@ -142,7 +143,7 @@ public class LoadTestRunner implements CommandLineRunner {
         long p99 = percentile(latencies, 99);
 
         System.out.printf("%n=== %s latency (ms) over %d samples, concurrency=%d ===%n",
-                label, latencies.size(), CONCURRENCY);
+                label, latencies.size(), load.concurrency());
         System.out.printf("  min=%-6d  avg=%-8.1f  p50=%-6d  p95=%-6d  p99=%-6d  max=%d%n",
                 min, avg, p50, p95, p99, max);
     }
