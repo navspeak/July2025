@@ -121,6 +121,10 @@
 			<artifactId>picocli-spring-boot-starter</artifactId>
 			<version>4.7.6</version>
 		</dependency>
+		<dependency>
+			<groupId>org.apache.httpcomponents.client5</groupId>
+			<artifactId>httpclient5</artifactId>
+		</dependency>
 	</dependencies>
 
 	<build>
@@ -128,6 +132,9 @@
 			<plugin>
 				<groupId>org.springframework.boot</groupId>
 				<artifactId>spring-boot-maven-plugin</artifactId>
+				<configuration>
+					<mainClass>com.example.encryption.EncryptionServiceApplication</mainClass>
+				</configuration>
 				<executions>
 					<execution>
 						<id>repackage</id>
