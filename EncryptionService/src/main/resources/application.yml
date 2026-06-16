@@ -9,7 +9,7 @@ server:
 
 app:
   vault:
-    url: ${VAULT_URL:http://localhost:8200}
+    url: ${VAULT_URL:http://127.0.0.1:8200}
     namespace:
     role-id: ${VAULT_ROLE_ID:your-role-id}
     secret-id: ${VAULT_SECRET_ID:your-secret-id}
@@ -25,11 +25,11 @@ spring:
       resourceserver:
         jwt:
           # Local Keycloak (docker/keycloak):
-          #   issuer-uri  : http://localhost:8080/realms/encryption
-          #   jwk-set-uri : http://localhost:8080/realms/encryption/protocol/openid-connect/certs
+          #   issuer-uri  : http://127.0.0.1:8080/realms/encryption
+          #   jwk-set-uri : http://127.0.0.1:8080/realms/encryption/protocol/openid-connect/certs
           #   audiences   : encryption-service
           issuer-uri: ${JWT_ISSUER_URI:http://localhost:8080/realms/encryption}
-          jwk-set-uri: ${JWT_JWK_SET_URI:http://localhost:8080/realms/encryption/protocol/openid-connect/certs}
+          jwk-set-uri: ${JWT_JWK_SET_URI:http://127.0.0.1:8080/realms/encryption/protocol/openid-connect/certs}
           audiences: ${JWT_AUDIENCE:encryption-service}
   servlet:
     multipart:
@@ -88,6 +88,7 @@ resilience4j:
 logging:
   level:
     com.example.encryption.config.VaultConfig: DEBUG
+    com.example.encryption.service.MultipartEncryptionService: DEBUG
 
 springdoc:
   swagger-ui:

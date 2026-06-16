@@ -1,7 +1,7 @@
 package com.example.encryption.controller;
 
 import com.example.encryption.dto.EncryptionRequest;
-import com.example.encryption.service.FileEncryptionService;
+import com.example.encryption.service.MultipartEncryptionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -20,9 +20,9 @@ import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBo
 @RequestMapping("/api/v1/file")
 public class EncryptionController {
 
-    private final FileEncryptionService fileEncryptionService;
+    private final MultipartEncryptionService fileEncryptionService;
 
-    public EncryptionController(FileEncryptionService fileEncryptionService) {
+    public EncryptionController(MultipartEncryptionService fileEncryptionService) {
         this.fileEncryptionService = fileEncryptionService;
     }
 

@@ -32,7 +32,7 @@ import java.util.Optional;
 @AllArgsConstructor
 @Service
 @Profile("!client")
-public class FileEncryptionService {
+public class MultipartEncryptionService {
 
     private static final long MAX_FILE_BYTES = 30 * 1024 * 1024; // 30 MB
 

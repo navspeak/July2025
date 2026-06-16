@@ -127,7 +127,7 @@ Encrypts an uploaded file using AES-256-GCM or ChaCha20-Poly1305. DEK is generat
 | `request.algorithm` | String | `multipart/form-data` | No | `AES_256_GCM` | `AES_256_GCM` or `CHACHA20_POLY1305` |
 | `request.keyId` | String | `multipart/form-data` | No | `my-key` | Vault transit key name |
 | `request.fileName` | String | `multipart/form-data` | No | Original filename | Override output filename in metadata |
-
+, a
 **Response**
 
 | Field | Value |

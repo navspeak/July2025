@@ -15,7 +15,7 @@ import org.springframework.security.web.SecurityFilterChain;
 @Slf4j
 @Configuration
 @EnableWebSecurity
-@Profile("!client & !runner & !load")
+@Profile("!client & !runner & !load & !cli")
 public class SecurityConfig {
 
     @Bean
@@ -40,14 +40,16 @@ public class SecurityConfig {
                 // Everything else requires a valid JWT
                 .anyRequest().authenticated()
             )
-            .oauth2ResourceServer(oauth2 -> oauth2.jwt(Customizer.withDefaults()))
-            .exceptionHandling(ex -> ex
+            .oauth2ResourceServer(oauth2 -> oauth2
+                .jwt(Customizer.withDefaults())
                 .authenticationEntryPoint((request, response, e) -> {
                     log.warn("Unauthorized {} {} from {}: {}",
                         request.getMethod(), request.getRequestURI(),
                         request.getRemoteAddr(), e.getMessage());
                     new BearerTokenAuthenticationEntryPoint().commence(request, response, e);
                 })
+            )
+            .exceptionHandling(ex -> ex
                 .accessDeniedHandler((request, response, e) -> {
                     log.warn("Forbidden {} {} from {}: {}",
                         request.getMethod(), request.getRequestURI(),

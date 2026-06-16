@@ -116,6 +116,11 @@
 			<artifactId>spring-boot-starter-test</artifactId>
 			<scope>test</scope>
 		</dependency>
+		<dependency>
+			<groupId>info.picocli</groupId>
+			<artifactId>picocli-spring-boot-starter</artifactId>
+			<version>4.7.6</version>
+		</dependency>
 	</dependencies>
 
 	<build>
@@ -123,6 +128,30 @@
 			<plugin>
 				<groupId>org.springframework.boot</groupId>
 				<artifactId>spring-boot-maven-plugin</artifactId>
+				<executions>
+					<execution>
+						<id>repackage</id>
+						<configuration>
+							<skip>true</skip>
+						</configuration>
+					</execution>
+					<execution>
+						<id>rest</id>
+						<goals><goal>repackage</goal></goals>
+						<configuration>
+							<classifier>rest</classifier>
+							<mainClass>com.example.encryption.EncryptionServiceApplication</mainClass>
+						</configuration>
+					</execution>
+					<execution>
+						<id>cli</id>
+						<goals><goal>repackage</goal></goals>
+						<configuration>
+							<classifier>cli</classifier>
+							<mainClass>com.example.encryption.cli.EncryptionCliApplication</mainClass>
+						</configuration>
+					</execution>
+				</executions>
 			</plugin>
 		</plugins>
 	</build>

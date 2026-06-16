@@ -1,5 +1,6 @@
-package com.example.encryption.runner;
+package com.example.encryption.cli;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
@@ -10,31 +11,38 @@ import org.springframework.web.client.RestTemplate;
 import java.time.Instant;
 import java.util.Map;
 
+@Slf4j
 @Component
-@Profile("runner | load")
+@Profile("cli")
 public class TokenProvider {
 
-    private final RunnerProperties.Jwt props;
+    private static final int EXPIRY_BUFFER_SECONDS = 30;
+
+    private final CliProperties.Jwt props;
     private final RestTemplate restTemplate = new RestTemplate();
 
     private String cachedToken;
     private Instant expiresAt = Instant.EPOCH;
 
-    public TokenProvider(RunnerProperties runnerProperties) {
-        this.props = runnerProperties.jwt();
+    public TokenProvider(CliProperties cliProperties) {
+        this.props = cliProperties.jwt();
     }
 
-    public synchronized String bearerToken() {
-        if (cachedToken == null || Instant.now().isAfter(expiresAt.minusSeconds(10))) {
+    public synchronized String getToken() {
+        if (cachedToken == null || Instant.now().isAfter(expiresAt)) {
             fetch();
         }
-        return "Bearer " + cachedToken;
+        return cachedToken;
+    }
+
+    public synchronized void invalidate() {
+        expiresAt = Instant.EPOCH;
     }
 
     @SuppressWarnings("unchecked")
     private void fetch() {
         MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
-        form.add("grant_type", props.grantType());
+        form.add("grant_type", "client_credentials");
         form.add("client_id", props.clientId());
         form.add("client_secret", props.clientSecret());
 
@@ -46,13 +54,15 @@ public class TokenProvider {
                 "Token endpoint rejected credentials (clientId=" + props.clientId()
                 + "): HTTP " + e.getStatusCode() + " — " + e.getResponseBodyAsString(), e);
         }
+
         if (response == null || !response.containsKey("access_token")) {
             throw new IllegalStateException(
-                "Token endpoint returned no access_token (clientId=" + props.clientId()
-                + "): " + response);
+                "Token endpoint returned no access_token: " + response);
         }
+
         cachedToken = (String) response.get("access_token");
         int expiresIn = ((Number) response.getOrDefault("expires_in", 60)).intValue();
-        expiresAt = Instant.now().plusSeconds(expiresIn);
+        expiresAt = Instant.now().plusSeconds(expiresIn - EXPIRY_BUFFER_SECONDS);
+        log.debug("Token fetched, expires in {}s", expiresIn);
     }
 }
