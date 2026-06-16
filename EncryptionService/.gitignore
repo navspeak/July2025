@@ -1,0 +1,6 @@
+target/
+*.class
+
+# External config files — contain secrets, never commit
+cli.properties
+cli-*.properties

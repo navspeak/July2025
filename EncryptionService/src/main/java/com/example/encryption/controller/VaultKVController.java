@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.Map;
 
 @Tag(name = ApiDocs.TAG_SECRETS)
-@Profile("!client")
+@Profile("!cli")
 @RestController
 @RequestMapping("/api/v1/secrets")
 public class VaultKVController {

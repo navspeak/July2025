@@ -8,7 +8,7 @@ import org.springframework.stereotype.Component;
 
 @Slf4j
 @Component
-@Profile("!client")
+@Profile("!cli")
 public class CipherBulkhead {
 
     @FunctionalInterface

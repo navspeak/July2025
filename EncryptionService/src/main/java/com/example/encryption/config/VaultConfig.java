@@ -53,7 +53,7 @@ import java.util.List;
  */
 @Slf4j
 @Configuration
-@Profile("!client")
+@Profile("!cli")
 public class VaultConfig extends AbstractVaultConfiguration {
 
     private final VaultProperties vaultProperties;

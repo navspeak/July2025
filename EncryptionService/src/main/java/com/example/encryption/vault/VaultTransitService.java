@@ -8,7 +8,7 @@ import org.springframework.vault.support.Ciphertext;
 import org.springframework.vault.support.Plaintext;
 
 @Service
-@Profile("!client")
+@Profile("!cli")
 public class VaultTransitService {
 
     private final VaultTemplate vaultTemplate;

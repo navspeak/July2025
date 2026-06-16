@@ -16,7 +16,7 @@ import java.nio.file.Path;
 import java.util.UUID;
 
 @Component
-@Profile("!client")
+@Profile("!cli")
 public class FileProcessor {
 
     @Value("${staging.dir:/tmp/encryption-staging}")

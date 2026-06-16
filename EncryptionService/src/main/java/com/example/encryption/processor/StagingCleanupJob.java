@@ -31,7 +31,7 @@ import java.util.stream.Stream;
  */
 @Slf4j
 @Component
-@Profile("!client")
+@Profile("!cli")
 public class StagingCleanupJob {
     private static final long CLEANUP_INTERVAL_MS = 3_600_000; // 1 hour
     private static final long MAX_AGE_MINUTES = 60;

@@ -31,7 +31,7 @@ import java.util.Optional;
 @Slf4j
 @AllArgsConstructor
 @Service
-@Profile("!client")
+@Profile("!cli")
 public class MultipartEncryptionService {
 
     private static final long MAX_FILE_BYTES = 30 * 1024 * 1024; // 30 MB

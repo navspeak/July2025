@@ -16,7 +16,7 @@ import java.io.IOException;
 import java.util.concurrent.atomic.AtomicInteger;
 
 @Component
-@Profile("!client")
+@Profile("!cli")
 public class TraceResponseFilter extends OncePerRequestFilter {
 
     // Dedicated logger name so log-parsing can target "ROUND_TRIP" lines precisely:

@@ -16,7 +16,7 @@ import java.security.SecureRandom;
 import java.util.Base64;
 
 @Component
-@Profile("!client")
+@Profile("!cli")
 public class EncryptionProcessor {
 
     private static final int IV_BYTES = 12;

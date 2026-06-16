@@ -9,7 +9,7 @@ import org.springframework.vault.support.Versioned;
 import java.util.Map;
 
 @Service
-@Profile("!client")
+@Profile("!cli")
 public class VaultKVService {
 
     private final VaultTemplate vaultTemplate;
