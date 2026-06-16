@@ -3,13 +3,13 @@ package com.example.encryption.cli;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 
 import java.time.Instant;
-import java.util.Map;
 
 @Slf4j
 @Component
@@ -39,30 +39,33 @@ public class TokenProvider {
         expiresAt = Instant.EPOCH;
     }
 
-    @SuppressWarnings("unchecked")
+    private record TokenResponse(
+            @JsonProperty("access_token") String accessToken,
+            @JsonProperty("expires_in") int expiresIn
+    ) {}
+
     private void fetch() {
         MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
         form.add("grant_type", "client_credentials");
         form.add("client_id", props.clientId());
         form.add("client_secret", props.clientSecret());
 
-        Map<String, Object> response;
+        TokenResponse response;
         try {
-            response = restTemplate.postForObject(props.tokenUri(), form, Map.class);
+            response = restTemplate.postForObject(props.tokenUri(), form, TokenResponse.class);
         } catch (HttpClientErrorException e) {
             throw new IllegalStateException(
                 "Token endpoint rejected credentials (clientId=" + props.clientId()
                 + "): HTTP " + e.getStatusCode() + " — " + e.getResponseBodyAsString(), e);
         }
 
-        if (response == null || !response.containsKey("access_token")) {
+        if (response == null || response.accessToken() == null) {
             throw new IllegalStateException(
-                "Token endpoint returned no access_token: " + response);
+                "Token endpoint returned no access_token for clientId=" + props.clientId());
         }
 
-        cachedToken = (String) response.get("access_token");
-        int expiresIn = ((Number) response.getOrDefault("expires_in", 60)).intValue();
-        expiresAt = Instant.now().plusSeconds(expiresIn - EXPIRY_BUFFER_SECONDS);
-        log.debug("Token fetched, expires in {}s", expiresIn);
+        cachedToken = response.accessToken();
+        expiresAt = Instant.now().plusSeconds(response.expiresIn() - EXPIRY_BUFFER_SECONDS);
+        log.debug("Token fetched, expires in {}s", response.expiresIn());
     }
 }
