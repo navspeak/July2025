@@ -30,14 +30,17 @@ public class EncryptDirCommand implements Runnable {
     @Option(names = "--transit-key", description = "Vault transit key name")
     private String transitKey;
 
+    @Option(names = "--same-dek", description = "Share one DEK across all files (one key-wrap call)")
+    private boolean sameDek;
+
     @Option(names = "--recursive", description = "Descend into subdirectories")
     private boolean recursive;
 
-    private final EncryptionClient client;
+    private final PathEncryptionService encryptionService;
     private final SuffixFilter filter;
 
-    public EncryptDirCommand(EncryptionClient client, SuffixFilter filter) {
-        this.client = client;
+    public EncryptDirCommand(PathEncryptionService encryptionService, SuffixFilter filter) {
+        this.encryptionService = encryptionService;
         this.filter = filter;
     }
 
@@ -58,30 +61,48 @@ public class EncryptDirCommand implements Runnable {
                 return;
             }
 
-            int succeeded = 0, failed = 0;
-            for (Path file : files) {
-                try {
-                    byte[] encrypted = client.encryptFile(
-                            Files.readAllBytes(file),
-                            file.getFileName().toString(),
-                            algorithm, transitKey);
-
-                    Path relative = dir.relativize(file);
-                    Path outFile = out.resolve(relative.resolveSibling(file.getFileName() + ".enc"));
-                    Files.createDirectories(outFile.getParent());
-                    Files.write(outFile, encrypted);
-                    System.out.printf("  encrypted: %s%n", file);
-                    succeeded++;
-                } catch (Exception e) {
-                    System.err.printf("  FAILED: %s — %s%n", file, e.getMessage());
-                    log.debug("Encrypt failure detail", e);
-                    failed++;
-                }
+            if (sameDek) {
+                runSameDek(files);
+            } else {
+                runPerFile(files);
             }
-            System.out.printf("%nDone: %d encrypted, %d failed%n", succeeded, failed);
 
         } catch (Exception e) {
             throw new RuntimeException("encrypt-dir failed: " + e.getMessage(), e);
         }
+    }
+
+    private void runPerFile(List<Path> files) {
+        int succeeded = 0, failed = 0;
+        for (Path file : files) {
+            Path outFile = resolveOutput(file);
+            try {
+                Files.createDirectories(outFile.getParent());
+                encryptionService.encryptFile(file, outFile, algorithm, transitKey);
+                System.out.printf("  encrypted: %s%n", file);
+                succeeded++;
+            } catch (Exception e) {
+                System.err.printf("  FAILED: %s — %s%n", file, e.getMessage());
+                log.debug("Encrypt failure detail", e);
+                failed++;
+            }
+        }
+        System.out.printf("%nDone: %d encrypted, %d failed%n", succeeded, failed);
+    }
+
+    private void runSameDek(List<Path> files) throws Exception {
+        List<PathEncryptionService.FileEncryptTask> tasks = files.stream()
+                .map(f -> new PathEncryptionService.FileEncryptTask(f, resolveOutput(f)))
+                .toList();
+        tasks.forEach(t -> {
+            try { Files.createDirectories(t.output().getParent()); }
+            catch (Exception e) { throw new RuntimeException(e); }
+        });
+        encryptionService.encryptFiles(tasks, algorithm, transitKey);
+        System.out.printf("Done: %d encrypted with shared DEK%n", tasks.size());
+    }
+
+    private Path resolveOutput(Path file) {
+        return out.resolve(dir.relativize(file)).resolveSibling(file.getFileName() + ".enc");
     }
 }

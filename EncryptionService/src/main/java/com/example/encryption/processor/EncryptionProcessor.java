@@ -3,7 +3,6 @@ package com.example.encryption.processor;
 import com.example.encryption.domain.EncryptionAlgorithm;
 import com.example.encryption.domain.FileEncryptionContext;
 import com.example.encryption.domain.FileEncryptionMetadata;
-import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.Cipher;
@@ -16,7 +15,6 @@ import java.security.SecureRandom;
 import java.util.Base64;
 
 @Component
-@Profile("!cli")
 public class EncryptionProcessor {
 
     private static final int IV_BYTES = 12;
@@ -26,23 +24,11 @@ public class EncryptionProcessor {
     private final SecureRandom random = new SecureRandom();
 
     public FileEncryptionContext initEncrypt(EncryptionAlgorithm algorithm) throws Exception {
-        byte[] keyBytes = generateKeyBytes(algorithm);
-        String dekBase64 = Base64.getEncoder().encodeToString(keyBytes);
-
-        byte[] iv = new byte[IV_BYTES];
-        random.nextBytes(iv);
-
-        Cipher cipher = buildEncryptCipher(algorithm, keyBytes, iv);
-        return new FileEncryptionContext(cipher, iv, dekBase64);
+        byte[] keyBytes = generateKey(algorithm);
+        return initEncryptWithKey(keyBytes, algorithm);
     }
 
-    public Cipher initDecryptCipher(FileEncryptionMetadata metadata, String dekBase64) throws Exception {
-        byte[] iv = Base64.getDecoder().decode(metadata.ivBase64());
-        byte[] dekBytes = Base64.getDecoder().decode(dekBase64);
-        return buildDecryptCipher(metadata.algorithm(), dekBytes, iv);
-    }
-
-    private byte[] generateKeyBytes(EncryptionAlgorithm algorithm) throws Exception {
+    public byte[] generateKey(EncryptionAlgorithm algorithm) throws Exception {
         return switch (algorithm) {
             case AES_256_GCM -> {
                 var kg = KeyGenerator.getInstance("AES");
@@ -51,11 +37,24 @@ public class EncryptionProcessor {
                 yield key.getEncoded();
             }
             case CHACHA20_POLY1305 -> {
-                byte[] key = new byte[32]; // 256-bit key
+                byte[] key = new byte[32];
                 random.nextBytes(key);
                 yield key;
             }
         };
+    }
+
+    public FileEncryptionContext initEncryptWithKey(byte[] keyBytes, EncryptionAlgorithm algorithm) throws Exception {
+        byte[] iv = new byte[IV_BYTES];
+        random.nextBytes(iv);
+        Cipher cipher = buildEncryptCipher(algorithm, keyBytes, iv);
+        return new FileEncryptionContext(cipher, iv, Base64.getEncoder().encodeToString(keyBytes));
+    }
+
+    public Cipher initDecryptCipher(FileEncryptionMetadata metadata, String dekBase64) throws Exception {
+        byte[] iv = Base64.getDecoder().decode(metadata.ivBase64());
+        byte[] dekBytes = Base64.getDecoder().decode(dekBase64);
+        return buildDecryptCipher(metadata.algorithm(), dekBytes, iv);
     }
 
     private Cipher buildEncryptCipher(EncryptionAlgorithm algorithm, byte[] keyBytes, byte[] iv) throws Exception {
