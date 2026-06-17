@@ -1,9 +1,9 @@
 package com.example.encryption.cli;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.HttpClientErrorException;
@@ -19,6 +19,7 @@ public class TokenProvider {
     private static final int EXPIRY_BUFFER_SECONDS = 30;
 
     private final CliProperties.Jwt props;
+    private final String tokenUri;
     private final RestTemplate restTemplate = new RestTemplate();
 
     private String cachedToken;
@@ -26,6 +27,8 @@ public class TokenProvider {
 
     public TokenProvider(CliProperties cliProperties) {
         this.props = cliProperties.jwt();
+        this.tokenUri = cliProperties.jwt().tokenUri();
+        enforceHttps();
     }
 
     public synchronized String getToken() {
@@ -37,6 +40,14 @@ public class TokenProvider {
 
     public synchronized void invalidate() {
         expiresAt = Instant.EPOCH;
+    }
+
+    private void enforceHttps() {
+        if (tokenUri == null || !tokenUri.startsWith("https://")) {
+            throw new IllegalStateException(
+                "cli.jwt.token-uri must use HTTPS to protect client credentials. " +
+                "Configured value: " + tokenUri);
+        }
     }
 
     private record TokenResponse(
@@ -52,11 +63,11 @@ public class TokenProvider {
 
         TokenResponse response;
         try {
-            response = restTemplate.postForObject(props.tokenUri(), form, TokenResponse.class);
+            response = restTemplate.postForObject(tokenUri, form, TokenResponse.class);
         } catch (HttpClientErrorException e) {
             throw new IllegalStateException(
                 "Token endpoint rejected credentials (clientId=" + props.clientId()
-                + "): HTTP " + e.getStatusCode() + " — " + e.getResponseBodyAsString(), e);
+                + "): HTTP " + e.getStatusCode(), e);
         }
 
         if (response == null || response.accessToken() == null) {
