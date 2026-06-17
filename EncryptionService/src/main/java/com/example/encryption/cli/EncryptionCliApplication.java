@@ -11,7 +11,7 @@ import picocli.CommandLine.Command;
 import picocli.CommandLine.Model.CommandSpec;
 import picocli.CommandLine.Spec;
 
-@SpringBootApplication
+@SpringBootApplication(scanBasePackages = "com.example.encryption")
 @EnableConfigurationProperties(CliProperties.class)
 @Profile("cli")
 public class EncryptionCliApplication implements CommandLineRunner, ExitCodeGenerator {
