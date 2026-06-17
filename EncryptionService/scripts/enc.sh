@@ -1,20 +1,22 @@
 #!/usr/bin/env bash
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
-
 # --- Config file ---
-CONFIG="${ENC_CONFIG:-$PROJECT_DIR/cli.properties}"
+# 1. ENC_CONFIG env var
+# 2. cli.properties in current directory
+CONFIG="${ENC_CONFIG:-$PWD/cli.properties}"
 if [ ! -f "$CONFIG" ]; then
   echo "ERROR: config file not found: $CONFIG" >&2
-  echo "Set ENC_CONFIG=/path/to/cli.properties or place cli.properties in $PROJECT_DIR" >&2
+  echo "Place cli.properties in the current directory or set ENC_CONFIG=/path/to/cli.properties" >&2
   exit 1
 fi
 
 # --- JAR ---
-JAR="${ENC_JAR:-$(ls "$PROJECT_DIR"/target/encryption-service-*-cli.jar 2>/dev/null | head -1)}"
+# 1. ENC_JAR env var
+# 2. Any encryption-service-*-cli.jar in current directory
+JAR="${ENC_JAR:-$(ls "$PWD"/encryption-service-*-cli.jar 2>/dev/null | head -1)}"
 if [ ! -f "$JAR" ]; then
-  echo "ERROR: CLI JAR not found. Run: mvn package -DskipTests" >&2
+  echo "ERROR: CLI JAR not found in $PWD" >&2
+  echo "Copy encryption-service-*-cli.jar here or set ENC_JAR=/path/to/cli.jar" >&2
   exit 1
 fi
 
