@@ -20,16 +20,19 @@ public class EncryptionCliApplication implements CommandLineRunner, ExitCodeGene
     private final EncryptDirCommand encryptDirCommand;
     private final EncryptZipCommand encryptZipCommand;
     private final EncryptTextCommand encryptTextCommand;
+    private final EncryptListCommand encryptListCommand;
     private int exitCode;
 
     public EncryptionCliApplication(EncryptFileCommand encryptFileCommand,
                                     EncryptDirCommand encryptDirCommand,
                                     EncryptZipCommand encryptZipCommand,
-                                    EncryptTextCommand encryptTextCommand) {
+                                    EncryptTextCommand encryptTextCommand,
+                                    EncryptListCommand encryptListCommand) {
         this.encryptFileCommand = encryptFileCommand;
         this.encryptDirCommand = encryptDirCommand;
         this.encryptZipCommand = encryptZipCommand;
         this.encryptTextCommand = encryptTextCommand;
+        this.encryptListCommand = encryptListCommand;
     }
 
     public static void main(String[] args) {
@@ -44,6 +47,7 @@ public class EncryptionCliApplication implements CommandLineRunner, ExitCodeGene
                 .addSubcommand(encryptDirCommand)
                 .addSubcommand(encryptZipCommand)
                 .addSubcommand(encryptTextCommand)
+                .addSubcommand(encryptListCommand)
                 .execute(args);
     }
 

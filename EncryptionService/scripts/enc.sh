@@ -9,6 +9,7 @@ Commands:
   encrypt-file   Encrypt a single file
   encrypt-dir    Encrypt matching files in a directory
   encrypt-zip    Encrypt matching entries inside a ZIP archive
+  encrypt-list   Encrypt files listed in a text file (one path per line)
 
 encrypt-text:
   enc.sh encrypt-text --plaintext <value> [--transit-key <key>]
@@ -29,6 +30,17 @@ encrypt-zip:
                      [--algorithm AES_256_GCM|CHACHA20_POLY1305] [--transit-key <key>]
 
   --same-dek    Share one DEK across all ZIP entries; default is per-entry DEK
+
+encrypt-list:
+  enc.sh encrypt-list --list <path> --out <path> [--same-dek]
+                      [--algorithm AES_256_GCM|CHACHA20_POLY1305] [--transit-key <key>]
+
+  List file format — one file path per line, blank lines and # comments ignored:
+    /data/file1.csv
+    /data/file2.txt
+    # this line is ignored
+
+  Failed encryptions are logged to failed_encryption.txt in cli.log-dir (see config).
 
 Config:
   Reads cli.properties from current directory by default.

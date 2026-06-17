@@ -2,3 +2,6 @@ spring:
   main:
     web-application-type: none
     banner-mode: off
+
+logging:
+  config: classpath:log4j2-cli.xml

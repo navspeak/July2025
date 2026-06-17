@@ -38,10 +38,14 @@ public class EncryptZipCommand implements Runnable {
 
     private final PathEncryptionService encryptionService;
     private final SuffixFilter filter;
+    private final FailureLogger failureLogger;
 
-    public EncryptZipCommand(PathEncryptionService encryptionService, SuffixFilter filter) {
+    public EncryptZipCommand(PathEncryptionService encryptionService,
+                             SuffixFilter filter,
+                             FailureLogger failureLogger) {
         this.encryptionService = encryptionService;
         this.filter = filter;
+        this.failureLogger = failureLogger;
     }
 
     @Override
@@ -97,6 +101,7 @@ public class EncryptZipCommand implements Runnable {
                         succeeded++;
                     } catch (Exception e) {
                         System.err.printf("  FAILED: %s — %s%n", entry.name(), e.getMessage());
+                        failureLogger.log(entry.name(), e.getMessage());
                         log.debug("Encrypt failure detail", e);
                         failed++;
                     } finally {

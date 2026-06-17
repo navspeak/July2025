@@ -4,3 +4,4 @@ cli.jwt.token-uri=http://<keycloak-host>/realms/encryption/protocol/openid-conne
 cli.jwt.client-id=<client-id>
 cli.jwt.client-secret=<client-secret>
 cli.suffix-to-encrypt=.csv,.txt,.json,.xml
+cli.log-dir=/var/log/enc

@@ -38,10 +38,14 @@ public class EncryptDirCommand implements Runnable {
 
     private final PathEncryptionService encryptionService;
     private final SuffixFilter filter;
+    private final FailureLogger failureLogger;
 
-    public EncryptDirCommand(PathEncryptionService encryptionService, SuffixFilter filter) {
+    public EncryptDirCommand(PathEncryptionService encryptionService,
+                             SuffixFilter filter,
+                             FailureLogger failureLogger) {
         this.encryptionService = encryptionService;
         this.filter = filter;
+        this.failureLogger = failureLogger;
     }
 
     @Override
@@ -83,6 +87,7 @@ public class EncryptDirCommand implements Runnable {
                 succeeded++;
             } catch (Exception e) {
                 System.err.printf("  FAILED: %s — %s%n", file, e.getMessage());
+                failureLogger.log(file.toString(), e.getMessage());
                 log.debug("Encrypt failure detail", e);
                 failed++;
             }
