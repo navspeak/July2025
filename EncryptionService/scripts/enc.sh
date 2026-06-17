@@ -6,11 +6,16 @@ Usage: enc.sh <command> [options]
 
 Commands:
   encrypt-text   Encrypt a plaintext string, prints vault:v1:... to stdout
+  encrypt-file   Encrypt a single file
   encrypt-dir    Encrypt matching files in a directory
   encrypt-zip    Encrypt matching entries inside a ZIP archive
 
 encrypt-text:
   enc.sh encrypt-text --plaintext <value> [--transit-key <key>]
+
+encrypt-file:
+  enc.sh encrypt-file --file <path> --out <path>
+                      [--algorithm AES_256_GCM|CHACHA20_POLY1305] [--transit-key <key>]
 
 encrypt-dir:
   enc.sh encrypt-dir --dir <path> --out <path> [--recursive] [--same-dek]
@@ -66,8 +71,20 @@ if [ ! -f "$JAR" ]; then
   exit 1
 fi
 
+# Convert Git Bash /c/Users/... paths to C:/Users/... for Spring on Windows
+to_native() {
+  if command -v cygpath &>/dev/null; then
+    cygpath -w "$1"
+  else
+    echo "$1"
+  fi
+}
+
+CONFIG_NATIVE="$(to_native "$CONFIG")"
+JAR_NATIVE="$(to_native "$JAR")"
+
 exec java \
-  -Dspring.config.additional-location="file:$CONFIG" \
+  -Dspring.config.additional-location="file:$CONFIG_NATIVE" \
   ${JAVA_OPTS:-} \
-  -jar "$JAR" \
+  -jar "$JAR_NATIVE" \
   "$@"

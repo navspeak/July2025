@@ -16,14 +16,17 @@ import picocli.CommandLine.Spec;
 @Profile("cli")
 public class EncryptionCliApplication implements CommandLineRunner, ExitCodeGenerator {
 
+    private final EncryptFileCommand encryptFileCommand;
     private final EncryptDirCommand encryptDirCommand;
     private final EncryptZipCommand encryptZipCommand;
     private final EncryptTextCommand encryptTextCommand;
     private int exitCode;
 
-    public EncryptionCliApplication(EncryptDirCommand encryptDirCommand,
+    public EncryptionCliApplication(EncryptFileCommand encryptFileCommand,
+                                    EncryptDirCommand encryptDirCommand,
                                     EncryptZipCommand encryptZipCommand,
                                     EncryptTextCommand encryptTextCommand) {
+        this.encryptFileCommand = encryptFileCommand;
         this.encryptDirCommand = encryptDirCommand;
         this.encryptZipCommand = encryptZipCommand;
         this.encryptTextCommand = encryptTextCommand;
@@ -37,6 +40,7 @@ public class EncryptionCliApplication implements CommandLineRunner, ExitCodeGene
     @Override
     public void run(String... args) {
         exitCode = new CommandLine(new RootCommand())
+                .addSubcommand(encryptFileCommand)
                 .addSubcommand(encryptDirCommand)
                 .addSubcommand(encryptZipCommand)
                 .addSubcommand(encryptTextCommand)
