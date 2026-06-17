@@ -134,20 +134,6 @@
 				</configuration>
 				<executions>
 					<execution>
-						<id>repackage</id>
-						<configuration>
-							<skip>true</skip>
-						</configuration>
-					</execution>
-					<execution>
-						<id>rest</id>
-						<goals><goal>repackage</goal></goals>
-						<configuration>
-							<classifier>rest</classifier>
-							<mainClass>com.example.encryption.EncryptionServiceApplication</mainClass>
-						</configuration>
-					</execution>
-					<execution>
 						<id>cli</id>
 						<goals><goal>repackage</goal></goals>
 						<configuration>

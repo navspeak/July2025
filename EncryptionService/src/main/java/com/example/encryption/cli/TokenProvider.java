@@ -4,6 +4,9 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.HttpClientErrorException;
@@ -56,14 +59,17 @@ public class TokenProvider {
     ) {}
 
     private void fetch() {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+        headers.setBasicAuth(props.clientId(), props.clientSecret());
+
         MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
         form.add("grant_type", "client_credentials");
-        form.add("client_id", props.clientId());
-        form.add("client_secret", props.clientSecret());
 
         TokenResponse response;
         try {
-            response = restTemplate.postForObject(tokenUri, form, TokenResponse.class);
+            response = restTemplate.postForObject(tokenUri,
+                    new HttpEntity<>(form, headers), TokenResponse.class);
         } catch (HttpClientErrorException e) {
             throw new IllegalStateException(
                 "Token endpoint rejected credentials (clientId=" + props.clientId()
