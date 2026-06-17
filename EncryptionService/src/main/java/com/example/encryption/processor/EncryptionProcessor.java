@@ -17,7 +17,6 @@ import java.util.Base64;
 @Component
 public class EncryptionProcessor {
 
-    private static final int IV_BYTES = 12;
     private static final int GCM_TAG_BITS = 128;
     private static final int KEY_BITS = 256;
 
@@ -45,9 +44,9 @@ public class EncryptionProcessor {
     }
 
     public FileEncryptionContext initEncryptWithKey(byte[] keyBytes, EncryptionAlgorithm algorithm) throws Exception {
-        byte[] iv = new byte[IV_BYTES];
-        random.nextBytes(iv);
-        Cipher cipher = buildEncryptCipher(algorithm, keyBytes, iv);
+        // JCE generates the IV/nonce internally using SecureRandom — no caller-supplied IV in the encrypt path
+        Cipher cipher = buildEncryptCipher(algorithm, keyBytes);
+        byte[] iv = cipher.getIV();
         return new FileEncryptionContext(cipher, iv, Base64.getEncoder().encodeToString(keyBytes));
     }
 
@@ -57,20 +56,16 @@ public class EncryptionProcessor {
         return buildDecryptCipher(metadata.algorithm(), dekBytes, iv);
     }
 
-    private Cipher buildEncryptCipher(EncryptionAlgorithm algorithm, byte[] keyBytes, byte[] iv) throws Exception {
+    private Cipher buildEncryptCipher(EncryptionAlgorithm algorithm, byte[] keyBytes) throws Exception {
         return switch (algorithm) {
             case AES_256_GCM -> {
                 Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
-                cipher.init(Cipher.ENCRYPT_MODE,
-                        new SecretKeySpec(keyBytes, "AES"),
-                        new GCMParameterSpec(GCM_TAG_BITS, iv));
+                cipher.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(keyBytes, "AES"));
                 yield cipher;
             }
             case CHACHA20_POLY1305 -> {
                 Cipher cipher = Cipher.getInstance("ChaCha20-Poly1305");
-                cipher.init(Cipher.ENCRYPT_MODE,
-                        new SecretKeySpec(keyBytes, "ChaCha20"),
-                        new IvParameterSpec(iv));
+                cipher.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(keyBytes, "ChaCha20"));
                 yield cipher;
             }
         };
