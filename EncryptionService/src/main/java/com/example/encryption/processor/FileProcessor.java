@@ -2,7 +2,6 @@ package com.example.encryption.processor;
 
 import com.example.encryption.domain.Operation;
 import com.example.encryption.domain.StagingPath;
-import com.example.encryption.util.FileNameUtils;
 import io.micrometer.tracing.Span;
 import io.micrometer.tracing.Tracer;
 import org.springframework.beans.factory.annotation.Value;
@@ -34,18 +33,40 @@ public class FileProcessor {
                 ? currentSpan.context().traceId()
                 : UUID.randomUUID().toString();
 
-        Path baseDir = Path.of(stagingDir);
+        Path baseDir = Path.of(stagingDir).toAbsolutePath().normalize();
         Files.createDirectories(baseDir);
 
-        Path inputPath = baseDir.resolve(traceId + "-input-" + FileNameUtils.sanitize(file.getOriginalFilename()));
+        // Staging filenames are trace-id based only — no user input in path
+        Path inputPath = baseDir.resolve(traceId + "-input");
         String suffix = op == Operation.ENCRYPT ? ".enc" : ".dec";
         Path outputPath = baseDir.resolve(traceId + "-output" + suffix);
+
+        assertWithinStaging(inputPath, baseDir);
+        assertWithinStaging(outputPath, baseDir);
 
         return new StagingPath(inputPath, outputPath, traceId);
     }
 
+    private void assertWithinStaging(Path path, Path baseDir) {
+        if (!path.normalize().startsWith(baseDir)) {
+            throw new SecurityException("Path traversal detected: " + path);
+        }
+    }
+
     public void stageInput(MultipartFile file, Path inputPath) throws IOException {
         file.transferTo(inputPath);
+    }
+
+    public byte[] readInput(StagingPath paths) throws IOException {
+        Path baseDir = Path.of(stagingDir).toAbsolutePath().normalize();
+        assertWithinStaging(paths.inputPath().toAbsolutePath().normalize(), baseDir);
+        return Files.readAllBytes(paths.inputPath());
+    }
+
+    public java.io.InputStream openInput(StagingPath paths) throws IOException {
+        Path baseDir = Path.of(stagingDir).toAbsolutePath().normalize();
+        assertWithinStaging(paths.inputPath().toAbsolutePath().normalize(), baseDir);
+        return Files.newInputStream(paths.inputPath());
     }
 
     public void cleanup(StagingPath paths) {

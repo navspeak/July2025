@@ -52,7 +52,7 @@ public class EncryptListCommand implements Runnable {
             List<Path> files = Files.readAllLines(list).stream()
                     .map(String::trim)
                     .filter(line -> !line.isBlank() && !line.startsWith("#"))
-                    .map(Path::of)
+                    .map(line -> Path.of(line).toAbsolutePath().normalize())
                     .filter(p -> {
                         if (!Files.isRegularFile(p)) {
                             System.err.printf("  SKIPPED (not found): %s%n", p);

@@ -10,6 +10,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
@@ -62,6 +64,16 @@ public class PathEncryptionService {
         }
     }
 
+    public void decryptFile(Path input, Path output, String transitKey) throws Exception {
+        try (InputStream in = safeOpen(input)) {
+            int metadataLen = ByteBuffer.wrap(in.readNBytes(4)).getInt();
+            FileEncryptionMetadata metadata = objectMapper.readValue(in.readNBytes(metadataLen), FileEncryptionMetadata.class);
+            String dekBase64 = encryptionClient.decryptText(metadata.wrappedDek(), transitKey);
+            byte[] decrypted = encryptionProcessor.initDecryptCipher(metadata, dekBase64).doFinal(in.readAllBytes());
+            Files.write(output, decrypted);
+        }
+    }
+
     private void writeEncrypted(Path input, Path output,
                                  FileEncryptionContext ctx, String wrappedDek,
                                  EncryptionAlgorithm algorithm) throws Exception {
@@ -72,12 +84,28 @@ public class PathEncryptionService {
                 algorithm);
 
         byte[] metadataBytes = objectMapper.writeValueAsBytes(metadata);
-        byte[] encrypted = ctx.cipher().doFinal(Files.readAllBytes(input));
+        byte[] encrypted = ctx.cipher().doFinal(safeRead(input));
 
         try (OutputStream out = Files.newOutputStream(output)) {
             out.write(ByteBuffer.allocate(4).putInt(metadataBytes.length).array());
             out.write(metadataBytes);
             out.write(encrypted);
         }
+    }
+
+    private byte[] safeRead(Path path) throws IOException {
+        Path safe = path.toAbsolutePath().normalize();
+        if (!Files.isRegularFile(safe)) {
+            throw new IllegalArgumentException("Not a regular file: " + safe);
+        }
+        return Files.readAllBytes(safe);
+    }
+
+    private InputStream safeOpen(Path path) throws IOException {
+        Path safe = path.toAbsolutePath().normalize();
+        if (!Files.isRegularFile(safe)) {
+            throw new IllegalArgumentException("Not a regular file: " + safe);
+        }
+        return Files.newInputStream(safe);
     }
 }

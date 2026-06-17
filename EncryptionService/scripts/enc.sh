@@ -10,6 +10,10 @@ Commands:
   encrypt-dir    Encrypt matching files in a directory
   encrypt-zip    Encrypt matching entries inside a ZIP archive
   encrypt-list   Encrypt files listed in a text file (one path per line)
+  decrypt-text   Decrypt a vault:v1:... ciphertext, prints plaintext to stdout
+  decrypt-file   Decrypt a single .enc file
+  decrypt-dir    Decrypt all .enc files in a directory
+  decrypt-list   Decrypt .enc files listed in a text file (one path per line)
 
 encrypt-text:
   enc.sh encrypt-text --plaintext <value> [--transit-key <key>]
@@ -41,6 +45,18 @@ encrypt-list:
     # this line is ignored
 
   Failed encryptions are logged to failed_encryption.txt in cli.log-dir (see config).
+
+decrypt-text:
+  enc.sh decrypt-text --ciphertext "vault:v1:..." [--transit-key <key>]
+
+decrypt-file:
+  enc.sh decrypt-file --file <path>.enc --out <path> [--transit-key <key>]
+
+decrypt-dir:
+  enc.sh decrypt-dir --dir <path> --out <path> [--recursive] [--transit-key <key>]
+
+decrypt-list:
+  enc.sh decrypt-list --list <path> --out <path> [--transit-key <key>]
 
 Config:
   Reads cli.properties from current directory by default.

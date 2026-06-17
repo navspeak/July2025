@@ -59,6 +59,19 @@ public class EncryptionClient {
         });
     }
 
+    public String decryptText(String ciphertext, String transitKey) {
+        return withRetry(() -> {
+            TextDecryptResponse response = restClient.post()
+                    .uri("/api/v1/text/decrypt")
+                    .header("Authorization", "Bearer " + tokenProvider.getToken())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(new TextDecryptRequest(ciphertext, transitKey))
+                    .retrieve()
+                    .body(TextDecryptResponse.class);
+            return response == null ? null : response.plaintext();
+        });
+    }
+
     private <T> T withRetry(Supplier<T> call) {
         try {
             return call.get();
@@ -89,4 +102,11 @@ public class EncryptionClient {
 
     private record TextEncryptResponse(
             @JsonProperty("ciphertext") String ciphertext) {}
+
+    private record TextDecryptRequest(
+            String ciphertext,
+            String transitKey) {}
+
+    private record TextDecryptResponse(
+            @JsonProperty("plaintext") String plaintext) {}
 }
