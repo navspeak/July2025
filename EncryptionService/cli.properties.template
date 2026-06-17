@@ -1,5 +1,4 @@
 cli.service-url=https://<host>:8443
-cli.skip-ssl-verify=true
 cli.jwt.token-uri=http://<keycloak-host>/realms/encryption/protocol/openid-connect/token
 cli.jwt.client-id=<client-id>
 cli.jwt.client-secret=<client-secret>

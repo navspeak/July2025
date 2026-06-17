@@ -5,7 +5,7 @@
 	<parent>
 		<groupId>org.springframework.boot</groupId>
 		<artifactId>spring-boot-starter-parent</artifactId>
-		<version>4.0.4</version>
+		<version>4.1.0</version>
 		<relativePath/>
 	</parent>
 	<groupId>com.example</groupId>
@@ -15,6 +15,7 @@
 
 	<properties>
 		<java.version>17</java.version>
+		<tomcat.version>11.0.22</tomcat.version>
 	</properties>
 
 	<dependencies>
@@ -120,10 +121,6 @@
 			<groupId>info.picocli</groupId>
 			<artifactId>picocli</artifactId>
 			<version>4.7.6</version>
-		</dependency>
-		<dependency>
-			<groupId>org.apache.httpcomponents.client5</groupId>
-			<artifactId>httpclient5</artifactId>
 		</dependency>
 	</dependencies>
 
