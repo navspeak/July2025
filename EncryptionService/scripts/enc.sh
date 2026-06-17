@@ -20,8 +20,18 @@ if [ ! -f "$JAR" ]; then
   exit 1
 fi
 
+# Suppress Spring Boot logs for help/version so output is clean
+EXTRA_OPTS=""
+for arg in "$@"; do
+  if [ "$arg" = "--help" ] || [ "$arg" = "-h" ] || [ "$arg" = "--version" ]; then
+    EXTRA_OPTS="-Dlogging.level.root=OFF -Dspring.main.banner-mode=off"
+    break
+  fi
+done
+
 exec java \
   -Dspring.config.additional-location="file:$CONFIG" \
+  ${EXTRA_OPTS} \
   ${JAVA_OPTS:-} \
   -jar "$JAR" \
   "$@"
