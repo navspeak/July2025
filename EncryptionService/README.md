@@ -109,7 +109,104 @@ vault:
 mvn spring-boot:run
 ```
 
-Service starts on `http://localhost:8081`.
+Service starts on `https://localhost:8443`.
+
+---
+
+## CLI Tool
+
+The CLI encrypts files locally (crypto runs on the client machine) and calls the REST service only to wrap the DEK via `/api/v1/text/encrypt`. Files are never sent to the server.
+
+### Build
+
+```bash
+mvn package -DskipTests
+# produces:
+#   target/encryption-service-*-rest.jar   REST service
+#   target/encryption-service-*-cli.jar    CLI tool
+```
+
+### Config file
+
+Create a `cli.properties` file (never commit — contains secrets):
+
+```properties
+cli.service-url=https://<host>:8443
+cli.skip-ssl-verify=true
+cli.jwt.token-uri=http://<keycloak-host>/realms/encryption/protocol/openid-connect/token
+cli.jwt.client-id=<client-id>
+cli.jwt.client-secret=<client-secret>
+cli.suffix-to-encrypt=.csv,.txt,.json,.xml
+```
+
+Pass it at startup via `-Dspring.config.additional-location=file:/path/to/cli.properties`.
+
+### Commands
+
+#### encrypt-text
+
+Encrypts a plaintext string. Prints the `vault:v1:...` ciphertext to stdout.
+
+```bash
+java -Dspring.config.additional-location=file:./cli.properties \
+     -jar target/encryption-service-*-cli.jar \
+     encrypt-text --plaintext "hello world"
+```
+
+#### encrypt-dir
+
+Encrypts matching files in a directory. Output files are written as `{filename}.enc`.
+
+```bash
+java -Dspring.config.additional-location=file:./cli.properties \
+     -jar target/encryption-service-*-cli.jar \
+     encrypt-dir \
+       --dir /data/landing \
+       --out /data/encrypted \
+      [--recursive] \
+      [--same-dek] \
+      [--algorithm AES_256_GCM | CHACHA20_POLY1305] \
+      [--transit-key my-key]
+```
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--dir` | required | Source directory |
+| `--out` | required | Output directory (created if absent) |
+| `--recursive` | false | Descend into subdirectories |
+| `--same-dek` | false | Share one DEK across all files — one key-wrap call total |
+| `--algorithm` | `AES_256_GCM` | Cipher algorithm |
+| `--transit-key` | server default | Vault transit key name |
+
+#### encrypt-zip
+
+Encrypts matching entries inside a ZIP archive. Each entry is written as a separate `{entry}.enc` file.
+
+```bash
+java -Dspring.config.additional-location=file:./cli.properties \
+     -jar target/encryption-service-*-cli.jar \
+     encrypt-zip \
+       --zip /data/archive.zip \
+       --out /data/encrypted \
+      [--same-dek] \
+      [--algorithm AES_256_GCM | CHACHA20_POLY1305] \
+      [--transit-key my-key]
+```
+
+#### Suffix filtering
+
+`cli.suffix-to-encrypt` controls which files are processed. Leave blank to encrypt everything (excluding already-encrypted `.enc` files).
+
+```properties
+cli.suffix-to-encrypt=.csv,.txt,.json
+```
+
+#### --help
+
+```bash
+java -jar target/encryption-service-*-cli.jar --help
+java -jar target/encryption-service-*-cli.jar encrypt-dir --help
+```
 
 ---
 
