@@ -39,13 +39,16 @@ public class EncryptDirCommand implements Runnable {
     private final PathEncryptionService encryptionService;
     private final SuffixFilter filter;
     private final FailureLogger failureLogger;
+    private final ProgressBar progressBar;
 
     public EncryptDirCommand(PathEncryptionService encryptionService,
                              SuffixFilter filter,
-                             FailureLogger failureLogger) {
+                             FailureLogger failureLogger,
+                             ProgressBar progressBar) {
         this.encryptionService = encryptionService;
         this.filter = filter;
         this.failureLogger = failureLogger;
+        this.progressBar = progressBar;
     }
 
     @Override
@@ -78,21 +81,21 @@ public class EncryptDirCommand implements Runnable {
 
     private void runPerFile(List<Path> files) {
         int succeeded = 0, failed = 0;
+        progressBar.start(files.size());
         for (Path file : files) {
             Path outFile = resolveOutput(file);
             try {
                 Files.createDirectories(outFile.getParent());
                 encryptionService.encryptFile(file, outFile, algorithm, transitKey);
-                System.out.printf("  encrypted: %s%n", file);
                 succeeded++;
             } catch (Exception e) {
-                System.err.printf("  FAILED: %s — %s%n", file, e.getMessage());
                 failureLogger.log(file.toString(), e.getMessage());
-                log.debug("Encrypt failure detail", e);
+                log.debug("Encrypt failure detail for {}", file, e);
                 failed++;
             }
+            progressBar.advance(file.getFileName().toString());
         }
-        System.out.printf("%nDone: %d encrypted, %d failed%n", succeeded, failed);
+        System.out.printf("Done: %d encrypted, %d failed%n", succeeded, failed);
     }
 
     private void runSameDek(List<Path> files) throws Exception {
@@ -103,7 +106,9 @@ public class EncryptDirCommand implements Runnable {
             try { Files.createDirectories(t.output().getParent()); }
             catch (Exception e) { throw new RuntimeException(e); }
         });
+        progressBar.start(tasks.size());
         encryptionService.encryptFiles(tasks, algorithm, transitKey);
+        tasks.forEach(t -> progressBar.advance(t.input().getFileName().toString()));
         System.out.printf("Done: %d encrypted with shared DEK%n", tasks.size());
     }
 

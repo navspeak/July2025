@@ -34,10 +34,14 @@ public class EncryptListCommand implements Runnable {
 
     private final PathEncryptionService encryptionService;
     private final FailureLogger failureLogger;
+    private final ProgressBar progressBar;
 
-    public EncryptListCommand(PathEncryptionService encryptionService, FailureLogger failureLogger) {
+    public EncryptListCommand(PathEncryptionService encryptionService,
+                              FailureLogger failureLogger,
+                              ProgressBar progressBar) {
         this.encryptionService = encryptionService;
         this.failureLogger = failureLogger;
+        this.progressBar = progressBar;
     }
 
     @Override
@@ -68,25 +72,26 @@ public class EncryptListCommand implements Runnable {
                 List<PathEncryptionService.FileEncryptTask> tasks = files.stream()
                         .map(f -> new PathEncryptionService.FileEncryptTask(f, out.resolve(f.getFileName() + ".enc")))
                         .toList();
+                progressBar.start(tasks.size());
                 encryptionService.encryptFiles(tasks, algorithm, transitKey);
-                files.forEach(f -> System.out.printf("  encrypted: %s%n", f));
-                System.out.printf("%nDone: %d encrypted with shared DEK%n", files.size());
+                tasks.forEach(t -> progressBar.advance(t.input().getFileName().toString()));
+                System.out.printf("Done: %d encrypted with shared DEK%n", tasks.size());
             } else {
                 int succeeded = 0, failed = 0;
+                progressBar.start(files.size());
                 for (Path file : files) {
                     Path outFile = out.resolve(file.getFileName() + ".enc");
                     try {
                         encryptionService.encryptFile(file, outFile, algorithm, transitKey);
-                        System.out.printf("  encrypted: %s%n", file);
                         succeeded++;
                     } catch (Exception e) {
-                        System.err.printf("  FAILED: %s — %s%n", file, e.getMessage());
                         failureLogger.log(file.toString(), e.getMessage());
                         log.debug("Encrypt failure detail", e);
                         failed++;
                     }
+                    progressBar.advance(file.getFileName().toString());
                 }
-                System.out.printf("%nDone: %d encrypted, %d failed%n", succeeded, failed);
+                System.out.printf("Done: %d encrypted, %d failed%n", succeeded, failed);
             }
 
         } catch (Exception e) {
