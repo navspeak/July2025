@@ -6,9 +6,11 @@ import org.springframework.stereotype.Component;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.stream.Stream;
 
 @Slf4j
 @Component
@@ -45,14 +47,20 @@ public class DecryptListCommand implements Runnable {
             List<Path> files = Files.readAllLines(list).stream()
                     .map(String::trim)
                     .filter(line -> !line.isBlank() && !line.startsWith("#"))
-                    .map(Path::of)
-                    .filter(p -> {
-                        if (!Files.isRegularFile(p)) {
-                            System.err.printf("  SKIPPED (not found): %s%n", p);
-                            failureLogger.log(p.toString(), "file not found");
-                            return false;
+                    .flatMap(line -> {
+                        try {
+                            Path p = Path.of(line).toRealPath();
+                            if (!Files.isRegularFile(p)) {
+                                System.err.printf("  SKIPPED (not found): %s%n", line);
+                                failureLogger.log(line, "file not found");
+                                return Stream.empty();
+                            }
+                            return Stream.of(p);
+                        } catch (IOException e) {
+                            System.err.printf("  SKIPPED (not found): %s%n", line);
+                            failureLogger.log(line, "file not found");
+                            return Stream.empty();
                         }
-                        return true;
                     })
                     .toList();
 

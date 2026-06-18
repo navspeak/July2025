@@ -10,8 +10,10 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.UUID;
 
 @Component
@@ -27,7 +29,7 @@ public class FileProcessor {
         this.tracer = tracer;
     }
 
-    public StagingPath resolvePaths(MultipartFile file, Operation op) throws IOException {
+    public StagingPath resolvePaths(Operation op) throws IOException {
         Span currentSpan = tracer.currentSpan();
         String traceId = currentSpan != null
                 ? currentSpan.context().traceId()
@@ -54,7 +56,9 @@ public class FileProcessor {
     }
 
     public void stageInput(MultipartFile file, Path inputPath) throws IOException {
-        file.transferTo(inputPath);
+        try (InputStream in = file.getInputStream()) {
+            Files.copy(in, inputPath, StandardCopyOption.REPLACE_EXISTING);
+        }
     }
 
     public byte[] readInput(StagingPath paths) throws IOException {

@@ -16,6 +16,11 @@
 	<properties>
 		<java.version>17</java.version>
 		<tomcat.version>11.0.22</tomcat.version>
+		<!-- REST (default) — comment out and uncomment CLI block below to switch -->
+<!--		<app.mainClass>com.example.encryption.EncryptionServiceApplication</app.mainClass>-->
+		<!-- CLI — uncomment below and comment out REST line above -->
+		<app.mainClass>com.example.encryption.cli.EncryptionCliApplication</app.mainClass>
+
 	</properties>
 
 	<dependencies>
@@ -125,24 +130,19 @@
 	</dependencies>
 
 	<build>
+		<!-- CLI — uncomment below to produce encryption-service-cli-{version}.jar -->
+		<finalName>${project.artifactId}-cli-${project.version}</finalName>
+
 		<plugins>
 			<plugin>
 				<groupId>org.springframework.boot</groupId>
 				<artifactId>spring-boot-maven-plugin</artifactId>
 				<configuration>
-					<mainClass>com.example.encryption.EncryptionServiceApplication</mainClass>
+					<mainClass>${app.mainClass}</mainClass>
 				</configuration>
-				<executions>
-					<execution>
-						<id>cli</id>
-						<goals><goal>repackage</goal></goals>
-						<configuration>
-							<classifier>cli</classifier>
-							<mainClass>com.example.encryption.cli.EncryptionCliApplication</mainClass>
-						</configuration>
-					</execution>
-				</executions>
 			</plugin>
 		</plugins>
 	</build>
+
+
 </project>

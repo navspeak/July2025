@@ -70,7 +70,7 @@ public class MultipartEncryptionService {
     }
 
     private StagingPath stage(MultipartFile file, Operation op) throws Exception {
-        StagingPath paths = fileProcessor.resolvePaths(file, op);
+        StagingPath paths = fileProcessor.resolvePaths(op);
         Timer.Sample sample = Timer.start(meterRegistry);
         fileProcessor.stageInput(file, paths.inputPath());
         sample.stop(timer("file.stage.latency", op.name().toLowerCase()));
