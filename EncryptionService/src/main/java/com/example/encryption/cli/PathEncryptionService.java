@@ -27,13 +27,16 @@ public class PathEncryptionService {
     private final EncryptionProcessor encryptionProcessor;
     private final EncryptionClient encryptionClient;
     private final ObjectMapper objectMapper;
+    private final SafeCliPaths safePaths;
 
     public PathEncryptionService(EncryptionProcessor encryptionProcessor,
                                   EncryptionClient encryptionClient,
-                                  ObjectMapper objectMapper) {
+                                  ObjectMapper objectMapper,
+                                  SafeCliPaths safePaths) {
         this.encryptionProcessor = encryptionProcessor;
         this.encryptionClient = encryptionClient;
         this.objectMapper = objectMapper;
+        this.safePaths = safePaths;
     }
 
     public record FileEncryptTask(Path input, Path output) {}
@@ -94,18 +97,10 @@ public class PathEncryptionService {
     }
 
     private byte[] safeRead(Path path) throws IOException {
-        Path safe = path.toAbsolutePath().normalize();
-        if (!Files.isRegularFile(safe)) {
-            throw new IllegalArgumentException("Not a regular file: " + safe);
-        }
-        return Files.readAllBytes(safe);
+        return safePaths.readAllBytes(path);
     }
 
     private InputStream safeOpen(Path path) throws IOException {
-        Path safe = path.toAbsolutePath().normalize();
-        if (!Files.isRegularFile(safe)) {
-            throw new IllegalArgumentException("Not a regular file: " + safe);
-        }
-        return Files.newInputStream(safe);
+        return safePaths.newInputStream(path);
     }
 }
