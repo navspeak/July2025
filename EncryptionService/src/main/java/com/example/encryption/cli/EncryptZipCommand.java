@@ -18,7 +18,7 @@ import java.util.zip.ZipInputStream;
 @Slf4j
 @Component
 @Profile("cli")
-@Command(name = "encrypt-zip", description = "Encrypt matching entries inside a ZIP archive")
+@Command(name = "encrypt-zip", mixinStandardHelpOptions = true, description = "Encrypt matching entries inside a ZIP archive")
 public class EncryptZipCommand implements Runnable {
 
     @Option(names = "--zip", required = true, description = "Source ZIP archive")

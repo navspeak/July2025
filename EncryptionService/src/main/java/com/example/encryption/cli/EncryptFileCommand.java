@@ -10,7 +10,7 @@ import java.nio.file.Path;
 
 @Component
 @Profile("cli")
-@Command(name = "encrypt-file", description = "Encrypt a single file")
+@Command(name = "encrypt-file", mixinStandardHelpOptions = true, description = "Encrypt a single file")
 public class EncryptFileCommand implements Runnable {
 
     @Option(names = "--file", required = true, description = "File to encrypt")

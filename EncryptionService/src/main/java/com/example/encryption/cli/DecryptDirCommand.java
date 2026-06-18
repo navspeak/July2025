@@ -14,7 +14,7 @@ import java.util.stream.Stream;
 @Slf4j
 @Component
 @Profile("cli")
-@Command(name = "decrypt-dir", description = "Decrypt all .enc files in a directory")
+@Command(name = "decrypt-dir", mixinStandardHelpOptions = true, description = "Decrypt all .enc files in a directory")
 public class DecryptDirCommand implements Runnable {
 
     @Option(names = "--dir", required = true, description = "Source directory containing .enc files")

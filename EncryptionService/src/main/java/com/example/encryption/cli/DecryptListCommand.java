@@ -15,7 +15,7 @@ import java.util.stream.Stream;
 @Slf4j
 @Component
 @Profile("cli")
-@Command(name = "decrypt-list", description = "Decrypt .enc files listed in a text file (one path per line)")
+@Command(name = "decrypt-list", mixinStandardHelpOptions = true, description = "Decrypt .enc files listed in a text file (one path per line)")
 public class DecryptListCommand implements Runnable {
 
     @Option(names = "--list", required = true, description = "Text file with one .enc file path per line")

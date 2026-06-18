@@ -15,7 +15,7 @@ import java.util.stream.Stream;
 @Slf4j
 @Component
 @Profile("cli")
-@Command(name = "encrypt-dir", description = "Encrypt matching files in a directory")
+@Command(name = "encrypt-dir", mixinStandardHelpOptions = true, description = "Encrypt matching files in a directory")
 public class EncryptDirCommand implements Runnable {
 
     @Option(names = "--dir", required = true, description = "Source directory")

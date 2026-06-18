@@ -7,7 +7,7 @@ import picocli.CommandLine.Option;
 
 @Component
 @Profile("cli")
-@Command(name = "encrypt-text", description = "Encrypt a plaintext string, prints ciphertext to stdout")
+@Command(name = "encrypt-text", mixinStandardHelpOptions = true, description = "Encrypt a plaintext string, prints ciphertext to stdout")
 public class EncryptTextCommand implements Runnable {
 
     @Option(names = "--plaintext", required = true, description = "Text to encrypt")

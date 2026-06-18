@@ -7,7 +7,7 @@ import picocli.CommandLine.Option;
 
 @Component
 @Profile("cli")
-@Command(name = "decrypt-text", description = "Decrypt a vault:v1:... ciphertext, prints plaintext to stdout")
+@Command(name = "decrypt-text", mixinStandardHelpOptions = true, description = "Decrypt a vault:v1:... ciphertext, prints plaintext to stdout")
 public class DecryptTextCommand implements Runnable {
 
     @Option(names = "--ciphertext", required = true, description = "Vault ciphertext token (vault:v1:...)")

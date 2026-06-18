@@ -9,7 +9,7 @@ import java.nio.file.Path;
 
 @Component
 @Profile("cli")
-@Command(name = "decrypt-file", description = "Decrypt a single .enc file")
+@Command(name = "decrypt-file", mixinStandardHelpOptions = true, description = "Decrypt a single .enc file")
 public class DecryptFileCommand implements Runnable {
 
     @Option(names = "--file", required = true, description = "Encrypted .enc file")
