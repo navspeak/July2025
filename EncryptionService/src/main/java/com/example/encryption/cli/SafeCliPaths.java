@@ -3,14 +3,19 @@ package com.example.encryption.cli;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
+import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.nio.channels.Channels;
 import java.nio.channels.FileChannel;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Component
 @Profile("cli")
@@ -29,6 +34,13 @@ public class SafeCliPaths {
             this.allowedBase = base;
         } else {
             this.allowedBase = null;
+        }
+    }
+
+    public List<String> readLines(Path path) throws IOException {
+        try (InputStream in = newInputStream(path);
+             BufferedReader reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8))) {
+            return reader.lines().collect(Collectors.toList());
         }
     }
 

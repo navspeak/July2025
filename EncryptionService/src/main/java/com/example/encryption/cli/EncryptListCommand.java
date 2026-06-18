@@ -37,13 +37,16 @@ public class EncryptListCommand implements Runnable {
     private final PathEncryptionService encryptionService;
     private final FailureLogger failureLogger;
     private final ProgressBar progressBar;
+    private final SafeCliPaths safePaths;
 
     public EncryptListCommand(PathEncryptionService encryptionService,
                               FailureLogger failureLogger,
-                              ProgressBar progressBar) {
+                              ProgressBar progressBar,
+                              SafeCliPaths safePaths) {
         this.encryptionService = encryptionService;
         this.failureLogger = failureLogger;
         this.progressBar = progressBar;
+        this.safePaths = safePaths;
     }
 
     @Override
@@ -51,7 +54,7 @@ public class EncryptListCommand implements Runnable {
         try {
             Files.createDirectories(out);
 
-            List<Path> files = Files.readAllLines(list.toRealPath()).stream()
+            List<Path> files = safePaths.readLines(list).stream()
                     .map(String::trim)
                     .filter(line -> !line.isBlank() && !line.startsWith("#"))
                     .flatMap(line -> {
