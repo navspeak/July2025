@@ -109,7 +109,7 @@ public class MultipartEncryptionService {
     private void doCipherEncrypt(FileEncryptionContext ctx, StagingPath paths,
                                  byte[] metadataBytes, long fileSize) throws Exception {
         Timer.Sample sample = Timer.start(meterRegistry);
-        byte[] encrypted = ctx.cipher().doFinal(fileProcessor.readInput(paths));
+        byte[] encrypted = ctx.cipher().doFinal(fileProcessor.readInput(paths.traceId()));
         sample.stop(timer("file.cipher.latency", "encrypt"));
         try (OutputStream out = Files.newOutputStream(paths.outputPath())) {
             out.write(ByteBuffer.allocate(4).putInt(metadataBytes.length).array());
@@ -130,7 +130,7 @@ public class MultipartEncryptionService {
     // Same reasoning as encrypt: GCM/Poly1305 auth tag forces JCE to buffer everything
     // before releasing plaintext — CipherInputStream gives no streaming benefit here.
     private void doCipherDecrypt(StagingPath paths, String transitKey) throws Exception {
-        try (InputStream in = fileProcessor.openInput(paths)) {
+        try (InputStream in = fileProcessor.openInput(paths.traceId())) {
             FileEncryptionMetadata metadata = readMetadata(in);
             String dekBase64 = vaultTransitService.unwrapDek(metadata.wrappedDek(), transitKey);
             Timer.Sample sample = Timer.start(meterRegistry);

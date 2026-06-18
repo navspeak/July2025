@@ -11,9 +11,13 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.channels.Channels;
+import java.nio.channels.FileChannel;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
 import java.util.UUID;
 
 @Component
@@ -61,16 +65,19 @@ public class FileProcessor {
         }
     }
 
-    public byte[] readInput(StagingPath paths) throws IOException {
-        Path baseDir = Path.of(stagingDir).toAbsolutePath().normalize();
-        assertWithinStaging(paths.inputPath().toAbsolutePath().normalize(), baseDir);
-        return Files.readAllBytes(paths.inputPath());
+    public byte[] readInput(String traceId) throws IOException {
+        try (InputStream in = openInput(traceId)) {
+            return in.readAllBytes();
+        }
     }
 
-    public java.io.InputStream openInput(StagingPath paths) throws IOException {
+    public InputStream openInput(String traceId) throws IOException {
         Path baseDir = Path.of(stagingDir).toAbsolutePath().normalize();
-        assertWithinStaging(paths.inputPath().toAbsolutePath().normalize(), baseDir);
-        return Files.newInputStream(paths.inputPath());
+        // Path derived solely from trusted components: stagingDir (config) + traceId (tracer)
+        Path real = baseDir.resolve(traceId + "-input").toRealPath();
+        assertWithinStaging(real, baseDir);
+        return Channels.newInputStream(
+                FileChannel.open(real, StandardOpenOption.READ, LinkOption.NOFOLLOW_LINKS));
     }
 
     public void cleanup(StagingPath paths) {
