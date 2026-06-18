@@ -51,7 +51,7 @@ public class EncryptListCommand implements Runnable {
         try {
             Files.createDirectories(out);
 
-            List<Path> files = Files.readAllLines(list).stream()
+            List<Path> files = Files.readAllLines(list.toRealPath()).stream()
                     .map(String::trim)
                     .filter(line -> !line.isBlank() && !line.startsWith("#"))
                     .flatMap(line -> {
