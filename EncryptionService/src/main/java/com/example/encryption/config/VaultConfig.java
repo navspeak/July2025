@@ -21,7 +21,13 @@ import org.springframework.vault.core.VaultTemplate;
 import org.springframework.web.client.RestTemplate;
 
 import java.net.URI;
+import java.net.http.HttpClient;
+import java.security.KeyManagementException;
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
+import java.time.Duration;
 import java.util.List;
+import javax.net.ssl.SSLContext;
 
 /**
  * Token acquisition flow:
@@ -85,8 +91,7 @@ public class VaultConfig extends AbstractVaultConfiguration {
     @Bean
     @Override
     public VaultTemplate vaultTemplate() {
-        JdkClientHttpRequestFactory base = new JdkClientHttpRequestFactory();
-        base.setReadTimeout(vaultProperties.readTimeout());
+        JdkClientHttpRequestFactory base = createSecureRequestFactory(vaultProperties.readTimeout());
 
         var factory = new InterceptingClientHttpRequestFactory(base, List.of(
                 (request, body, execution) -> {
@@ -116,8 +121,20 @@ public class VaultConfig extends AbstractVaultConfiguration {
 
     // Auth only — plain RestTemplate, no interceptors.
     private RestTemplate buildRestTemplate() {
-        JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory();
-        requestFactory.setReadTimeout(vaultProperties.readTimeout());
-        return VaultClients.createRestTemplate(vaultEndpoint(), requestFactory);
+        return VaultClients.createRestTemplate(vaultEndpoint(), createSecureRequestFactory(vaultProperties.readTimeout()));
+    }
+
+    // Pins TLS randomness to SecureRandom, preventing weak PRNG reachability through JDK HttpClient's JCA init path.
+    private static JdkClientHttpRequestFactory createSecureRequestFactory(Duration readTimeout) {
+        try {
+            SSLContext sslContext = SSLContext.getInstance("TLS");
+            sslContext.init(null, null, new SecureRandom());
+            JdkClientHttpRequestFactory factory = new JdkClientHttpRequestFactory(
+                    HttpClient.newBuilder().sslContext(sslContext).build());
+            factory.setReadTimeout(readTimeout);
+            return factory;
+        } catch (NoSuchAlgorithmException | KeyManagementException e) {
+            throw new IllegalStateException("Failed to initialize secure HTTP client for Vault", e);
+        }
     }
 }
